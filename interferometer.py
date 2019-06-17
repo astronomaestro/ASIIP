@@ -9,18 +9,19 @@ from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz, GeocentricTrueEcliptic, Angle, concatenate, concatenate_representations
 import astropy.visualization as viz
 
-def star_rater(catalog, cat_name, tel_array, xlen, ylen, wavelength):
+def star_rater(catalog, cat_name, tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5):
     good_stars=[]
     coverages=[]
+    ang_diams = []
     calc_ra=[]
     calc_dec=[]
     for i, star in enumerate(catalog):
         total_obs_time = 0 * u.hour
         ra, dec, ang_diam = tel_array.ra_dec_diam_getter(cat_name, star)
 
-        if ra not in calc_ra and dec not in calc_dec:
-            calc_ra.append(ra)
-            calc_dec.append(dec)
+        if ra.value not in calc_ra and dec.value not in calc_dec:
+            calc_ra.append(ra.value)
+            calc_dec.append(dec.value)
             print("\nAnalyzing Star RA %s DEC %s at %s" % (ra, dec, i))
 
         else:
@@ -30,7 +31,7 @@ def star_rater(catalog, cat_name, tel_array, xlen, ylen, wavelength):
         if np.alen(tel_array.observable_times) > 0:
             total_obs_time = np.ptp(tel_array.observable_times)
 
-        if total_obs_time < 2. * u.hour:
+        if total_obs_time < cutoff_obs_time * u.hour:
             print("Skipping star RA %s DEC %s as it is observable only %s" % (ra, dec, total_obs_time))
             continue
 
@@ -56,7 +57,8 @@ def star_rater(catalog, cat_name, tel_array, xlen, ylen, wavelength):
 
         coverages.append(percent_coverage)
         good_stars.append(i)
-    return np.array(good_stars), np.array(coverages)
+        ang_diams.append(ang_diam.value)
+    return np.array(good_stars), np.array(coverages), np.array(ang_diams)
 
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
@@ -94,12 +96,12 @@ veritas_array = IIdata.IItelescope(telLat=veritas_telLat, telLon=veritas_telLon,
 veritas_tels = [veritas_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
 
 
-mag_range = (1, 3)
+mag_range = (0, 3)
 dec_range = (-20, 90)
 ra_range = ((veritas_array.dark_times.min()-4*u.hourangle).to('deg').value, veritas_array.dark_times.max().to('deg').value)
 xlen=500
 ylen=500
-wavelength = 500e-9 * u.m
+wavelength = 410e-9 * u.m
 u_arcsec = 1e-3 * u.arcsec
 # get stars that appeary during the specified night
 
@@ -107,7 +109,7 @@ veritas_array.make_gaia_query(mag_range=mag_range,
                               ra_range=ra_range,
                               dec_range=dec_range)
 
-gaia_stars, gaia_coverages = star_rater(catalog=veritas_array.gaia,
+gaia_stars, gaia_coverages, gaia_diam = star_rater(catalog=veritas_array.gaia,
                                           cat_name="GAIA",
                                           tel_array=veritas_array,
                                           xlen=xlen,
@@ -118,7 +120,7 @@ veritas_array.make_tess_query(mag_range=mag_range,
                               ra_range=ra_range,
                               dec_range=dec_range)
 
-tess_stars, tess_coverages = star_rater(catalog=veritas_array.tess,
+tess_stars, tess_coverages, tess_diam = star_rater(catalog=veritas_array.tess,
                                           cat_name="TESS",
                                           tel_array=veritas_array,
                                           xlen=xlen,
@@ -131,7 +133,7 @@ veritas_array.make_cadars_query(from_database=True,
                                 ra_range=ra_range,
                                 dec_range=dec_range)
 
-cedar_stars, cedar_coverages = star_rater(catalog=veritas_array.cedars,
+cedar_stars, cedar_coverages, cedar_diam = star_rater(catalog=veritas_array.cedars,
                                           cat_name="CEDARS",
                                           tel_array=veritas_array,
                                           xlen=xlen,
@@ -142,7 +144,7 @@ veritas_array.make_charm2_query(mag_range=mag_range,
                                 ra_range=ra_range,
                                 dec_range=dec_range)
 
-charm2_stars, charm2_coverages = star_rater(catalog=veritas_array.charm2,
+charm2_stars, charm2_coverages, charm2_diam = star_rater(catalog=veritas_array.charm2,
                                           cat_name="CHARM2",
                                           tel_array=veritas_array,
                                           xlen=xlen,
@@ -155,7 +157,7 @@ charm2_stars, charm2_coverages = star_rater(catalog=veritas_array.charm2,
 veritas_array.make_jmmc_query(mag_range=mag_range,
                               ra_range=ra_range,
                               dec_range=dec_range)
-jmmc_stars, jmmc_coverages = star_rater(catalog=veritas_array.jmmc,
+jmmc_stars, jmmc_coverages, jmmc_diam = star_rater(catalog=veritas_array.jmmc,
                                           cat_name="JMMC",
                                           tel_array=veritas_array,
                                           xlen=xlen,
@@ -170,17 +172,30 @@ charm2_coords = SkyCoord(veritas_array.charm2[charm2_stars]["RAJ2000"], veritas_
 cedars_coords = SkyCoord(veritas_array.cedars[cedar_stars]["RAJ2000"], veritas_array.cedars[cedar_stars]["DEJ2000"], unit=(u.hourangle, u.deg))
 jmmc_coords = SkyCoord(veritas_array.jmmc[jmmc_stars]["RAJ2000"], veritas_array.jmmc[jmmc_stars]["DEJ2000"], unit=(u.hourangle, u.deg))
 
+
+
 coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
-
 one_mighty_catalog = SkyCoord(gaia_coords)
+for cat in coords_:
+    closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
+    one_mighty_catalog = SkyCoord([c.data for c in one_mighty_catalog[skydis > 1*u.arcsec]] + [c.data for c in cat])
+print()
+print(np.sort(one_mighty_catalog.data._values))
 
-closest_star, skydis, distance3d = gaia_coords.match_to_catalog_sky(tess_coords)
-unique_idx = closest_star[skydis > 1*u.arcsec]
+# coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
+#
+# one_mighty_catalog = SkyCoord(gaia_coords)
+#
+# closest_star, skydis, distance3d = gaia_coords.match_to_catalog_sky(tess_coords)
+# unique_idx = closest_star[skydis > 1*u.arcsec]
+#
+# not_in_gaia = tess_coords[unique_idx]
+# concatenate([gaia_coords,not_in_gaia])
+#
+# one_mighty_catalog = SkyCoord(gaia_coords)
 
-not_in_gaia = tess_coords[unique_idx]
-concatenate([gaia_coords,not_in_gaia])
 
-one_mighty_catalog = SkyCoord(gaia_coords)
+
 
 # for cat in coords_:
 #     closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
@@ -191,17 +206,17 @@ one_mighty_catalog = SkyCoord(gaia_coords)
 
 
 
-coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
-one_mighty_catalog = SkyCoord(gaia_coords)
-
-for cat in coords_:
-    closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
-    unique_idx = closest_star[skydis > 1 * u.arcsec]
-    print(unique_idx)
-
-    not_in_coords = cat[unique_idx]
-    if np.alen(not_in_coords) > 0:
-        one_mighty_catalog = SkyCoord([c.data for c in one_mighty_catalog] + [c.data for c in not_in_coords])
+# coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
+# one_mighty_catalog = SkyCoord(gaia_coords)
+#
+# for cat in coords_:
+#     closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
+#     unique_idx = closest_star[skydis > 1 * u.arcsec]
+#     print(unique_idx)
+#
+#     not_in_coords = cat[unique_idx]
+#     if np.alen(not_in_coords) > 0:
+#         one_mighty_catalog = SkyCoord([c.data for c in one_mighty_catalog] + [c.data for c in not_in_coords])
 
 
 np_cov = np.array(coverages)

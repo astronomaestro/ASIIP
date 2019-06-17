@@ -66,10 +66,6 @@ def airy_disk2D(shape, xpos, ypos, r):
     return p_init(x,y), p_init
 
 
-
-
-
-
 def gaussian_disk2D():
     from astropy.modeling import models
     import warnings
@@ -111,7 +107,6 @@ def gaussian_disk2D():
 
 
 def track_coverage(tel_tracks, airy_func):
-
     x_0 = airy_func.x_0.value
     y_0 = airy_func.y_0.value
     ranges = []
