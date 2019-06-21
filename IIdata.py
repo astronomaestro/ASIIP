@@ -42,7 +42,8 @@ class IItelescope():
         self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
         dark_times = np.where((self.sunaltazs.alt < -15*u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
-
+        self.catalogs = []
+        self.cat_names = []
 
     def add_baseline(self, Bew, Bns, Bud):
         self.Bews.append(Bew)
@@ -87,25 +88,11 @@ class IItelescope():
         good_vals = np.where(~np.isnan(result[0]['Rad']))
 
         self.gaia = result[0][good_vals]
+        self.catalogs.append(self.gaia)
+        self.cat_names.append("GAIA")
 
 
-        # if from_database:
-        #
-        #     gaia_query = "select " \
-        #                  "gaia_source.source_id, gaia_source.ra, gaia_source.dec, gaia_source.parallax, gaia_source.phot_g_mean_mag, " \
-        #                  "gaia_source.teff_val, gaia_source.radius_val, gaia_source.lum_val " \
-        #                  "from gaiadr2.gaia_source " \
-        #                  "where (gaiadr2.gaia_source.ra >=%s and gaiadr2.gaia_source.ra <=%s " \
-        #                  "and gaiadr2.gaia_source.dec >=%s and gaiadr2.gaia_source.dec <=%s " \
-        #                  "and gaiadr2.gaia_source.phot_g_mean_mag >=%s and gaiadr2.gaia_source.phot_g_mean_mag <=%s)"\
-        #                  %(ra_range[0], ra_range[1], dec_range[0], dec_range[1], mag_range[0], mag_range[1])
-        #
-        #
-        #     job = Gaia.launch_job(gaia_query, output_file="observableStars.xml", dump_to_file=True)
-        #     result = job.get_results()
-        #     asd=123
-
-    def make_cadars_query(self, from_database=True, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100), load_vizier=True):
+    def make_cedars_query(self, from_database=True, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100), load_vizier=True):
         columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag']
         v = Vizier()
         v.ROW_LIMIT = -1
@@ -117,7 +104,8 @@ class IItelescope():
 
         good_val = np.where(~np.isnan(result[0]['Diam']))
         self.cedars = result[0][good_val]
-        asdf=123
+        self.catalogs.append(self.cedars)
+        self.cat_names.append("CEDARS")
 
 
     def make_charm2_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
@@ -133,6 +121,8 @@ class IItelescope():
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
         good_val = np.where(~np.isnan(result[0]['UD']))
         self.charm2 = result[0][good_val]
+        self.catalogs.append(self.charm2)
+        self.cat_names.append("CHARM2")
 
     def make_jmmc_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
         columns = ['RAJ2000','DEJ2000','2MASS','Tessmag','Teff','R*','M*','logg','Dis','Gmag','Vmag']
@@ -147,22 +137,23 @@ class IItelescope():
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
         good_val = np.where(~np.isnan(result[0]['Dis']))
         self.jmmc = result[0][good_val]
+        self.catalogs.append(self.jmmc)
+        self.cat_names.append("JMMC")
 
-    def bright_star_cat(self, ra_range=(30, 100), dec_range=(30, 100)):
-        from astroquery.vizier import Vizier
-        Vizier.ROW_LIMIT = -1
-        bs_cat = Vizier.get_catalogs("V/50")[0]
-        RAJ2000 = Angle(bs_cat["RAJ2000"], u.hourangle)
-        DEJ2000 = Angle(bs_cat["DEJ2000"], u.deg)
-        viewable_stars = np.where((RAJ2000 > ra_range[0] * u.hourangle) & (RAJ2000 < ra_range[1] * u.hourangle) &
-                                  (DEJ2000 > dec_range[0] * u.deg) & (DEJ2000 < dec_range[1] * u.deg))
-        self.BS_stars = bs_cat[viewable_stars]
-
-        adf=12312
+    # def bright_star_cat(self, ra_range=(30, 100), dec_range=(30, 100)):
+    #     from astroquery.vizier import Vizier
+    #     Vizier.ROW_LIMIT = -1
+    #     bs_cat = Vizier.get_catalogs("V/50")[0]
+    #     RAJ2000 = Angle(bs_cat["RAJ2000"], u.hourangle)
+    #     DEJ2000 = Angle(bs_cat["DEJ2000"], u.deg)
+    #     viewable_stars = np.where((RAJ2000 > ra_range[0] * u.hourangle) & (RAJ2000 < ra_range[1] * u.hourangle) &
+    #                               (DEJ2000 > dec_range[0] * u.deg) & (DEJ2000 < dec_range[1] * u.deg))
+    #     self.BS_stars = bs_cat[viewable_stars]
+    #
+    #     adf=12312
 
     def make_tess_query(self, mag_range=(1, 6), ra_range=(0, 360), dec_range=(-90, 90)):
         print("Retrieving Catalogue")
-
 
         columns = ['RAJ2000','DEJ2000','TIC','2MASS','Tessmag','Teff','R*','M*','logg','Dist','Gmag','Vmag']
         v = Vizier(columns=columns)
@@ -175,16 +166,8 @@ class IItelescope():
         good_val = np.where(~np.isnan(result[0]['R_']))
 
         self.tess = result[0][good_val]
-        #
-        #
-        # result = v.query_constraints(catalog="J/AJ/156/102", Tessmag='<%s'%mag_range[1],
-        #                                   RAJ2000='>%s & <%s'%(ra_range[0], ra_range[1]),
-        #                                   DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
-        # print(result[0][np.where(result[0]['_2MASS'] == '05474538-0940105')])
-        # angular_diam =(((result[0]['R_']).to('m') / (result[0]['Dist']).to('m'))*u.rad).to("arcsec")
-        # viewable_stars = np.where((RAJ2000 > ra_range[0] * u.hourangle) & (RAJ2000 < ra_range[1] * u.hourangle) &
-        #                           (DEJ2000 > dec_range[0] * u.deg) & (DEJ2000 < dec_range[1] * u.deg))
-        # self.TESS_stars = tessCat[low_mind][viewable_stars]
+        self.catalogs.append(self.tess)
+        self.cat_names.append("TESS")
 
     def download_vizier_cat(self, cat, name):
         from astroquery.vizier import Vizier
@@ -197,26 +180,26 @@ class IItelescope():
         if tel.upper() == "CEDARS":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
-            ang_diam = star["Diam"] * u.arcsec
+            ang_diam = star["Diam"].to('arcsec')
         elif tel.upper() == "JMMC":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
-            ang_diam = star["UDDB"]/1000 * u.arcsec
+            ang_diam = star["UDDB"].to('arcsec')
         elif tel.upper() == "CHARM2":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
-            ang_diam = star["UD"]/1000 * u.arcsec
+            ang_diam = star["UD"].to('arcsec')
         elif tel.upper() == "TESS":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
-            dist= star['Dist']*u.parsec
-            diam= star['R_']*u.solRad
+            dist= star['Dist']
+            diam= star['R_']
             ang_diam = (((diam.to('m')/dist.to('m')))*u.rad).to('arcsec')
         elif tel.upper() == "GAIA":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             dist = 1/(star['Plx']/1000)*u.parsec
             diam= star['Rad']*u.solRad
-            ang_diam = (((diam.to('m')/dist.to('m')))*u.rad).to('arcsec')
+            ang_diam = (((star["Rad"].to('m')/dist.to('m')))*u.rad).to('arcsec')
 
         return ra,dec,ang_diam
