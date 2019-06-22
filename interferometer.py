@@ -1,39 +1,33 @@
 from intensityInterferometry import IIdata, IItools, IIdisplay, IImodels
 import numpy as np
 import matplotlib.pyplot as plt
-import numpy as np
-import matplotlib.pyplot as plt
-from astropy.visualization import astropy_mpl_style
 import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz, GeocentricTrueEcliptic, Angle, concatenate, concatenate_representations
 import astropy.visualization as viz
+from astropy.table import Table
 
-
-# for cat in coords_:
-#     closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
-#     full_coord_array = [c.data for c in one_mighty_catalog[skydis > 1*u.arcsec]] + [c.data for c in cat]
-#
-#     one_mighty_catalog = SkyCoord([c.data for c in one_mighty_catalog[skydis > 1*u.arcsec]] + [c.data for c in cat])
 
 def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5):
-    good_stars=[]
     coverages=[]
     good_diams = []
     good_ra = []
     good_dec = []
     calc_ra=[]
     calc_dec=[]
+    good_mags = []
+    good_mag_names = []
+    cat_names = []
     coords_done = SkyCoord([(0*u.deg,0*u.deg)])
     i = 0
     for catalog, cat_name in zip(tel_array.catalogs, tel_array.cat_names):
-        ras, decs, ang_diams = tel_array.ra_dec_diam_getter(cat_name, catalog)
+        ras, decs, ang_diams, mags, mag_name = tel_array.ra_dec_diam_getter(cat_name, catalog)
         pos_cat=SkyCoord(ras,decs)
         closest_star, skydis, distance3d = pos_cat.match_to_catalog_sky(coords_done)
         clo_idx = skydis > 1 * u.arcsec
         coords_done = SkyCoord([c.data for c in pos_cat[clo_idx]] + [c.data for c in coords_done])
 
-        for ra,dec,ang_diam in zip(ras[clo_idx], decs[clo_idx], ang_diams[clo_idx]):
+        for ra,dec,ang_diam, mag in zip(ras[clo_idx], decs[clo_idx], ang_diams[clo_idx], mags[clo_idx]):
             total_obs_time = 0 * u.hour
 
             if ra.value not in calc_ra and dec.value not in calc_dec:
@@ -52,7 +46,7 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5):
                 continue
 
             i = i+1
-            # if i== 13:
+            # if i== 36:
             #     asdf=123
 
             tel_tracks = [IItools.uv_tracks(lat=tel_array.telLat.to('rad').value,
@@ -71,12 +65,20 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5):
 
             percent_coverage = IItools.track_coverage(tel_tracks=tel_tracks,
                                                       airy_func=airy_func)
+            if percent_coverage > .95:
+                asdf=23
 
             coverages.append(percent_coverage)
             good_diams.append(ang_diam.value)
             good_ra.append(ra.value)
             good_dec.append(dec.value)
-    return np.array(coverages), np.array(good_diams), np.array(good_ra), np.array(good_dec)
+            good_mag_names.append(mag_name)
+            good_mags.append(mag)
+            cat_names.append(cat_name)
+    data_table = Table([np.array(good_ra), np.array(good_dec), np.array(good_diams), np.array(coverages),
+                        np.array(good_mag_names), np.array(good_mags), np.array(cat_names)],
+                       names=("RA","DEC","ANGDIAM","UVCOV","FILT","MAG","CAT"))
+    return data_table
 
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
@@ -87,23 +89,11 @@ T2_mcgill=np.array([44.1,-47.7,4.4])
 T3_mcgill=np.array([29.4,60.1,9.8])
 T4_mcgill=np.array([-35.9,11.3,7.0])
 
-# IItools.airy_disk2D((200,200), 100, 100, 8)
-# IItools.gaussian_disk2D()
 
 veritas_locs = [T1_mcgill, T2_mcgill, T3_mcgill, T4_mcgill]
 
 baselines = IItools.array_baselines(veritas_locs)
 
-
-# xlen=500
-# ylen=500
-# wavelength = 415e-9 * u.m
-# binary = IImodels.binary_visibility2D(shape=(xlen, ylen),
-#                             flux_ratio=1,
-#                             separation=.8e-3 *u.arcsec,
-#                             arcsec1 = 3e-3 * u.arcsec,
-#                             arcsec2 = 3e-3 * u.arcsec,
-#                             wavelength=wavelength)
 time = '2019-6-13 07:00:00'
 star_name = "SPICA"
 
@@ -114,7 +104,7 @@ veritas_array = IIdata.IItelescope(telLat=veritas_telLat, telLon=veritas_telLon,
 veritas_tels = [veritas_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
 
 
-mag_range = (0, 3)
+mag_range = (-3, 3)
 dec_range = (-20, 90)
 ra_range = ((veritas_array.dark_times.min()-4*u.hourangle).to('deg').value, veritas_array.dark_times.max().to('deg').value)
 xlen=500
@@ -122,6 +112,10 @@ ylen=500
 wavelength = 410e-9 * u.m
 u_arcsec = 1e-3 * u.arcsec
 # get stars that appeary during the specified night
+
+# veritas_array.make_simbad_query(mag_range=mag_range,
+#                               ra_range=ra_range,
+#                               dec_range=dec_range)
 
 veritas_array.make_gaia_query(mag_range=mag_range,
                               ra_range=ra_range,
@@ -135,7 +129,7 @@ veritas_array.make_tess_query(mag_range=mag_range,
 
 
 
-veritas_array.make_cedars_query(from_database=True,
+veritas_array.make_cadars_query(from_database=True,
                                 mag_range=mag_range,
                                 ra_range=ra_range,
                                 dec_range=dec_range)
@@ -152,80 +146,26 @@ veritas_array.make_jmmc_query(mag_range=mag_range,
                               dec_range=dec_range)
 
 
-coverages, diams, ras, decs = star_rater(tel_array=veritas_array,
+
+
+veritas_cat = star_rater(tel_array=veritas_array,
                                           xlen=xlen,
                                           ylen=ylen,
                                           wavelength=wavelength)
 
-bstidx = np.argsort(coverages)
+np.set_printoptions(threshold=np.inf)
+gcov = np.where(veritas_cat["UVCOV"] > 0)
+bstidx = np.argsort(veritas_cat[gcov]["UVCOV"])
+veritas_cat[gcov][bstidx][::-1].pprint(max_lines=10000000000, max_width=10000000000000)
+from astroquery.simbad import Simbad
+Simbad.add_votable_fields('flux(B)', 'flux(G)')
+sim = Simbad.query_region(SkyCoord(veritas_cat[gcov][bstidx]["RA"], veritas_cat[gcov][bstidx]["RA"], unit=(u.deg, u.deg)))
 
-# gaia_coords = SkyCoord(veritas_array.gaia[gaia_stars]["RAJ2000"], veritas_array.gaia[gaia_stars]["DEJ2000"])
-# tess_coords = SkyCoord(veritas_array.tess[tess_stars]["RAJ2000"], veritas_array.tess[tess_stars]["DEJ2000"])
-# charm2_coords = SkyCoord(veritas_array.charm2[charm2_stars]["RAJ2000"], veritas_array.charm2[charm2_stars]["DEJ2000"], unit=(u.hourangle, u.deg))
-# cedars_coords = SkyCoord(veritas_array.cedars[cedar_stars]["RAJ2000"], veritas_array.cedars[cedar_stars]["DEJ2000"], unit=(u.hourangle, u.deg))
-# jmmc_coords = SkyCoord(veritas_array.jmmc[jmmc_stars]["RAJ2000"], veritas_array.jmmc[jmmc_stars]["DEJ2000"], unit=(u.hourangle, u.deg))
-#
-#
-#
-# coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
-# one_mighty_catalog = SkyCoord(gaia_coords)
-# full_data_array = {}
-# for cat in coords_:
-#     closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
-#     full_coord_array = [c.data for c in one_mighty_catalog[skydis > 1*u.arcsec]] + [c.data for c in cat]
-#
-#     one_mighty_catalog = SkyCoord([c.data for c in one_mighty_catalog[skydis > 1*u.arcsec]] + [c.data for c in cat])
 print()
-# print(np.sort(one_mighty_catalog.data._values))
-
-# coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
-#
-# one_mighty_catalog = SkyCoord(gaia_coords)
-#
-# closest_star, skydis, distance3d = gaia_coords.match_to_catalog_sky(tess_coords)
-# unique_idx = closest_star[skydis > 1*u.arcsec]
-#
-# not_in_gaia = tess_coords[unique_idx]
-# concatenate([gaia_coords,not_in_gaia])
-#
-# one_mighty_catalog = SkyCoord(gaia_coords)
 
 
 
 
-# for cat in coords_:
-#     closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
-#     unique_idx = closest_star[skydis > 1 * u.arcsec]
-#
-#     not_in_coords = cat[unique_idx]
-#     one_mighty_catalog = concatenate([one_mighty_catalog, not_in_coords])
-
-
-
-# coords_ = [tess_coords, charm2_coords, cedars_coords, jmmc_coords]
-# one_mighty_catalog = SkyCoord(gaia_coords)
-#
-# for cat in coords_:
-#     closest_star, skydis, distance3d = one_mighty_catalog.match_to_catalog_sky(cat)
-#     unique_idx = closest_star[skydis > 1 * u.arcsec]
-#     print(unique_idx)
-#
-#     not_in_coords = cat[unique_idx]
-#     if np.alen(not_in_coords) > 0:
-#         one_mighty_catalog = SkyCoord([c.data for c in one_mighty_catalog] + [c.data for c in not_in_coords])
-
-
-np_cov = np.array(coverages)
-np_goodStar = np.array(good_stars)
-cov_sort = np.argsort(np_cov)
-asdbvasdfv=23123
-
-name = catalog[np_goodStar[cov_sort][-1]]["Name"]
-
-
-for i in range(len(coverages)):
-    print("%s\t%s\t%s\t%s" % (catalog[np_goodStar][cov_sort]["Name"][i], np_cov[cov_sort][i],
-                              catalog[np_goodStar][cov_sort]["RAJ2000"][i], catalog[np_goodStar][cov_sort]["DEJ2000"][i]))
 
 
 
@@ -246,45 +186,6 @@ for i in range(len(coverages)):
 #                                 mag_range=(1,3),
 #                                 ra_range=(0,360),
 #                                 dec_range=(-20,90))
-
-# #
-# # veritas_array.bright_star_cat(ra_range=ra_range,
-#                                 dec_range=(-20,90))
-#
-
-# mag_range = (1, 3)
-# dec_range = (-20, 90)
-# veritas_array.tess_star_cat(mag_range=mag_range,
-#                             ra_range=ra_range,
-#                             dec_range=dec_range)
-# veritas_array.make_jmmc_query(from_database=True,
-#                               mag_range=mag_range,
-#                               ra_range=ra_range,
-#                               dec_range=dec_range,
-#                               load_vizier=True)
-#
-# veritas_array.make_charm2_query(from_database=True,
-#                                 mag_range=mag_range,
-#                                 ra_range=ra_range,
-#                                 dec_range=dec_range,
-#                                 load_vizier=True)
-
-# veritas_array.make_cadars_query(from_database=True,
-#                                 mag_range=mag_range,
-#                                 ra_range=(0,360),
-#                                 dec_range=dec_range)
-
-# veritas_array.make_gaia_query(from_database=True,
-#                               mag_range=mag_range,
-#                               ra_range=(0,360),
-#                               dec_range=dec_range)
-#
-# plt.figure(figsize=(18,8))
-# plt.hist(veritas_array.JMMC_stars["Bmag"])
-# plt.title("Historgram from JMMC catalogue V2")
-# plt.xlabel("B magnitude")
-# plt.ylabel("Number of objects")
-
 
 asfadsf=1234123
 

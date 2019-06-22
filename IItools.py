@@ -128,7 +128,7 @@ def track_coverage(tel_tracks, airy_func):
     else:
         r0_cor = 0
     r0_coverage = np.ptp(filt_ranges) - r0_cor
-    percent_cov = 1 - r0_coverage/r_0
+    percent_cov = r0_coverage/r_0
     return percent_cov
 
 def interval_merger(intervals):

@@ -75,12 +75,12 @@ class IItelescope():
 
 
     def make_gaia_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
-        columns = ['N', 'RAJ2000','DEJ2000','Gmag','BPmag, "RPmag','Teff','Rad','Lum','Plx']
+        columns = ['N', 'RAJ2000','DEJ2000','Gmag','BPmag','RPmag','Teff','Rad','Lum','Plx']
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         print("Retrieving Catalogue")
         result = v.query_constraints(catalog="I/345/gaia2",
-                                     RPmag='>%s & <%s' %(mag_range[0], mag_range[1]),
+                                     Gmag='>%s & <%s' %(mag_range[0], mag_range[1]),
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
         asdf=123
@@ -92,7 +92,7 @@ class IItelescope():
         self.cat_names.append("GAIA")
 
 
-    def make_cedars_query(self, from_database=True, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100), load_vizier=True):
+    def make_cadars_query(self, from_database=True, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100), load_vizier=True):
         columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag']
         v = Vizier()
         v.ROW_LIMIT = -1
@@ -103,13 +103,13 @@ class IItelescope():
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         good_val = np.where(~np.isnan(result[0]['Diam']))
-        self.cedars = result[0][good_val]
-        self.catalogs.append(self.cedars)
+        self.cadars = result[0][good_val]
+        self.catalogs.append(self.cadars)
         self.cat_names.append("CEDARS")
 
 
     def make_charm2_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
-        columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag']
+        columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag', 'Bmag']
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         print("Retrieving Catalogue")
@@ -125,7 +125,7 @@ class IItelescope():
         self.cat_names.append("CHARM2")
 
     def make_jmmc_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
-        columns = ['RAJ2000','DEJ2000','2MASS','Tessmag','Teff','R*','M*','logg','Dis','Gmag','Vmag']
+        columns = ['RAJ2000','DEJ2000','2MASS','Tessmag','Teff','R*','M*','logg','Dis','Gmag','Vmag','Bmag']
         v = Vizier()
         v.ROW_LIMIT = -1
         print("Retrieving Catalogue")
@@ -139,6 +139,8 @@ class IItelescope():
         self.jmmc = result[0][good_val]
         self.catalogs.append(self.jmmc)
         self.cat_names.append("JMMC")
+
+
 
     # def bright_star_cat(self, ra_range=(30, 100), dec_range=(30, 100)):
     #     from astroquery.vizier import Vizier
@@ -169,6 +171,15 @@ class IItelescope():
         self.catalogs.append(self.tess)
         self.cat_names.append("TESS")
 
+    def make_simbad_query(self, mag_range=(1, 6), ra_range=(0, 360), dec_range=(-90, 90)):
+        from astroquery.simbad import Simbad
+        Simbad.add_votable_fields('flux(B)', 'flux(G)')
+        Simbad.query_criteria(catalog="J/AJ/156/102",
+                                     Tessmag='Bmag >%s & Bmag <%s & '
+                                             'RA >%s & RA <%s & '
+                                             'DEC >%s & DEC <%s' %
+                                             (mag_range[0], mag_range[1],ra_range[0], ra_range[1],dec_range[0], dec_range[1]))
+
     def download_vizier_cat(self, cat, name):
         from astroquery.vizier import Vizier
         Vizier.ROW_LIMIT = -1
@@ -176,30 +187,44 @@ class IItelescope():
         cata = Vizier.get_catalogs(catalog.keys())
         ascii.write(cata, "%s.dat"%(name))
 
+    def simbad_matcher(self,ras,decs):
+        from astroquery.simbad import Simbad
+        coords = SkyCoord(ras,decs,unit=(u.deg, u.deg))
+        Simbad.get_field_description()
+
     def ra_dec_diam_getter(self, tel, star):
         if tel.upper() == "CEDARS":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             ang_diam = star["Diam"].to('arcsec')
+            mag_name = "Vmag"
+            mag = star[mag_name]
         elif tel.upper() == "JMMC":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             ang_diam = star["UDDB"].to('arcsec')
+            mag_name = "Bmag"
+            mag = star[mag_name]
         elif tel.upper() == "CHARM2":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             ang_diam = star["UD"].to('arcsec')
+            mag_name = "Bmag"
+            mag = star[mag_name]
         elif tel.upper() == "TESS":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             dist= star['Dist']
-            diam= star['R_']
+            diam= (star['R_']*2)*u.solRad
             ang_diam = (((diam.to('m')/dist.to('m')))*u.rad).to('arcsec')
+            mag_name = "Tessmag"
+            mag = star[mag_name]
         elif tel.upper() == "GAIA":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             dist = 1/(star['Plx']/1000)*u.parsec
-            diam= star['Rad']*u.solRad
-            ang_diam = (((star["Rad"].to('m')/dist.to('m')))*u.rad).to('arcsec')
+            ang_diam = (((2*star["Rad"].to('m')/dist.to('m')))*u.rad).to('arcsec')
+            mag_name = "Gmag"
+            mag = star[mag_name]
 
-        return ra,dec,ang_diam
+        return ra,dec,ang_diam,mag,mag_name
