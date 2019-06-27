@@ -1,4 +1,4 @@
-from intensityInterferometry import IIdata, IItools, IIdisplay, IImodels
+from IntensityInterferometry import IImodels, IIdisplay, IItools, IIdata
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -74,7 +74,7 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
                                                              wavelength=wavelength)
 
             r0_percent, r1_percent, r2_percent, r0_amp, r1_amp = IItools.track_coverage(tel_tracks=tel_tracks,
-                                                      airy_func=airy_func)
+                                                                                        airy_func=airy_func)
 
             if r0_percent > .95:
                 asdf=23
@@ -109,10 +109,10 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
     else:
         obs_t = np.full(np.alen(total_obs_times),obs_t)
     amp_errs = IItools.track_error(sig1=tel_array.err_sig,
-                                  m1=tel_array.err_mag,
-                                  m2=bmag,
-                                  t1=tel_array.err_t1,
-                                  t2=obs_t)
+                                   m1=tel_array.err_mag,
+                                   m2=bmag,
+                                   t1=tel_array.err_t1,
+                                   t2=obs_t)
     amp_err_ratio = np_covs[:,3]/amp_errs
 
     data_table = Table([sim_id, col(good_ra, unit=u.hourangle), col(good_dec, unit=u.deg), col(good_diams, unit=u.mas),

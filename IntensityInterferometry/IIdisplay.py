@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 import astropy.units as u
 import astropy.visualization as viz
-from intensityInterferometry import IItools
+from IntensityInterferometry import IItools
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os
