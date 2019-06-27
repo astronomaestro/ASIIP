@@ -48,6 +48,7 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_disk, arcsec, 
     plt.ylabel("V (meters)", fontsize=22)
     title = "UV plane coverage of %s at %s and %s Airy Disk at times \n %s to %s" % (name, wavelength,arcsec, starttime.T, endtime.T)
     plt.title(title, fontsize=18)
+    plt.colorbar()
     graph_saver(save_dir, title)
 
 
@@ -72,17 +73,20 @@ def uvtracks_amplitudes(tel_tracks, baselines, airy_func, arcsec, wavelength, sa
     graph_saver(save_dir, title)
 
     plt.figure(figsize=(14, 10))
+    ebar_density = 40
     for i, track in enumerate(tel_tracks):
         utrack = track[0][:, 0] + x_0
         vtrack = track[0][:, 1] + y_0
         airy_amp = airy_func(utrack, vtrack)
         airy_radius = np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2)
+        yerr = np.full(np.alen(airy_radius), err)
+        plt.errorbar(x=airy_radius[0::ebar_density], y=airy_amp[0::ebar_density], yerr=yerr[0::ebar_density], fmt='o')
         plt.plot(airy_radius, airy_amp, 'o')
-
     plt.title("UV radius Vs ampltiude coverage")
     plt.xlabel('UV radius')
     plt.ylabel("normalized amplitude")
     plt.xlim(0, 180)
+    plt.ylim(0)
     graph_saver(save_dir, title+"1D")
 
 def radial_profile_plot(data, center, data_name, arcsec, wavelength, save_dir):
