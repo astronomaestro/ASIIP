@@ -106,6 +106,7 @@ def gaussian_disk2D():
     plt.title("Residual")
 
 
+
 def track_coverage(tel_tracks, airy_func):
     x_0 = airy_func.x_0.value
     y_0 = airy_func.y_0.value
@@ -148,6 +149,19 @@ def curve_amplitude(ranges, st, end, airy_func, x_0, y_0):
 def track_error(sig1,m1,m2,t1,t2):
     return sig1*(2.512)**(m2-m1) * (t1/t2)**.5
 
+def trap_w_err(numerical_f, r, erra, errb):
+    fa = numerical_f[:-1]
+    fb = numerical_f[1:]
+    ra = r[:-1]
+    rb = r[1:]
+    C = (fa + fb)/2
+    dr = rb-ra
+    I = dr * C
+    Ierr = dr*np.sqrt(erra**2 + errb*2)*C
+    return I, Ierr, dr
+
+
+
 def interval_merger(intervals):
     sint = sorted(intervals, key=lambda i: i[0])
     out = [sint[0]]
@@ -158,7 +172,6 @@ def interval_merger(intervals):
         else:
             out.append(current)
     return out
-
 
 def getIntersection(interval_1, interval_2):
     st = np.max([interval_1[0], interval_2[0]])

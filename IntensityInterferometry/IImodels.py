@@ -1,6 +1,8 @@
 import numpy as np
 from astropy.modeling.models import custom_model
 import astropy.visualization as viz
+from IntensityInterferometry import IImodels, IIdisplay, IItools, IIdata
+from matplotlib import pyplot as plt
 
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
@@ -29,13 +31,56 @@ def airy_disk2D(shape, xpos, ypos, arcsec, wavelength):
     from astropy.modeling.functional_models import AiryDisk2D
     from astropy.modeling import fitting
 
-    r = 1.22 * wavelength.to('m').value / arcsec.to('rad').value
+    r = wavelength.to('m').value / arcsec.to('rad').value
 
     y, x = np.mgrid[:shape[0], :shape[1]]
     # Fit the data using astropy.modeling
     airy_init = AiryDisk2D(x_0=xpos, y_0=ypos, radius=r)
     fit_p = fitting.LevMarLSQFitter()
     return airy_init(x,y), airy_init
+
+def airy1D(xr, r):
+    from scipy.special import j1
+    con = 1.2196698912665045
+    airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
+    return airy_mod
+
+def fit_airy1D(rx,airy_amp, guess_r, errs, bounds=(-np.inf, np.inf)):
+    from scipy.optimize import curve_fit
+
+    popt, pcov = curve_fit(f=airy1D,
+              xdata=rx,
+              ydata=airy_amp,
+              p0=[guess_r],
+              sigma=errs,
+              bounds=bounds,
+                maxfev=1000)
+
+    return popt, pcov
+
+def airy_disk1D(tel_tracks, airy_func, err):
+    amps = []
+    rads = []
+    Ints = []
+    Irads = []
+    aerrs = []
+    xerrs = []
+    x_0 = airy_func.x_0.value
+    y_0 = airy_func.y_0.value
+    for i, track in enumerate(tel_tracks):
+        utrack = track[0][:, 0] + x_0
+        vtrack = track[0][:, 1] + y_0
+        amps.append(airy_func(utrack, vtrack))
+        rads.append(np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2))
+        airy_I, trap_err, Irad = IItools.trap_w_err(amps[i], rads[i], err, err)
+        Ints.append(airy_I/Irad)
+        Irads.append(.5*Irad + rads[i][:-1])
+        aerrs.append(np.ones(np.alen(Ints[i])) * np.random.normal(0,err, np.alen(airy_I)))
+        xerrs.append(Irad)
+    return np.ravel(amps), np.ravel(rads), np.ravel(Ints), np.ravel(Irads), np.ravel(aerrs), np.ravel(xerrs)
+
+# def fit_airy_1D(xdata, ydata, r, amp):
+#     airy_init = mod
 
 def binary_visibility2D(shape, flux_ratio, separation, wavelength, arcsec1, arcsec2):
 

@@ -48,6 +48,7 @@ class IItelescope():
         self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
         dark_times = np.where((self.sunaltazs.alt < -15*u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
+        self.integration_times = self.dark_times
 
         #the hour_correction is to shift the sky to include stars that have just barely risen
         hour_correction = 6 * u.hourangle
@@ -55,6 +56,12 @@ class IItelescope():
         self.ra_range = ((self.dark_times.min() - hour_correction).to('deg').value, self.dark_times.max().to('deg').value)
         self.catalogs = []
         self.cat_names = []
+
+
+    def modify_obs_times(self, start,end, int_time):
+        wanted_times = (np.arange(start.to('rad').value, end.to('rad').value, Angle(int_time).to('rad').value)*u.rad).to('hourangle')
+        self.integration_times = wanted_times
+
 
     def add_baseline(self, Bew, Bns, Bud):
         self.Bews.append(Bew)
@@ -81,6 +88,7 @@ class IItelescope():
 
         self.observable_times = observable_times
         self.sidereal_times = self.telFrame.obstime.sidereal_time('apparent')[sky_ind] - starToTrack.ra
+        self.integration_times = self.sidereal_times
         self.star_degs = starLoc.alt.to("deg")[sky_ind]
 
 

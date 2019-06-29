@@ -1,12 +1,57 @@
 import matplotlib.pyplot as plt
 import astropy.units as u
 import astropy.visualization as viz
+from astropy.coordinates import Angle
 from IntensityInterferometry import IItools
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os
 
 
+def changing_veritas_values(varray, star):
+    times = varray.sidereal_times
+    name = star["SIMID"]
+
+    print("So current sideral observation times for %s are %s to %s, with integration times of %s"
+          %(name,np.min(times), np.max(times), times[1]-times[0]))
+
+    chng_ver_vals = input("Do you want to change these? y for yes, anything else for no.\n")
+    if chng_ver_vals.lower() == 'y':
+        while True:
+            try:
+                print("Make sure you enter your times in the exact same format as printed before like -> '.2h.2m.2s' unless you want unexpected behavior.\n")
+                mod_start = Angle(input("Please enter when you want the observation to start.\n"))
+                mod_end = Angle(input("Please enter when you want the observation to end.\n"))
+                integration_time = Angle(input("Please enter the integration time you desire IN THE SAME FORMAT\n"))
+                varray.modify_obs_times(mod_start, mod_end, integration_time)
+                break
+            except Exception as e:
+                print("Make sure you entered in the time in a format like %s and you chose a valid starting and end time"%(np.min(times)))
+
+def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
+    noise_array = 0
+    nlen = np.alen(varray.integration_times)-1
+    if noise:
+        noise_array = np.random.normal(0,err,nlen)
+    x_0 = airy_func.x_0.value
+    y_0 = airy_func.y_0.value
+    plt.figure(figsize=(22, 16))
+    for i, track in enumerate(tel_tracks):
+        utrack = track[0][:, 0] + x_0
+        vtrack = track[0][:, 1] + y_0
+        airy_amp = airy_func(utrack, vtrack)
+        airy_radius = np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2)
+        airy_I, trap_err, Irads = IItools.trap_w_err(airy_amp, airy_radius, err, err)
+        airy_err = np.ones(np.alen(airy_I)) * err
+        plt.errorbar(x=.5*Irads + airy_radius[:-1], y=airy_I / Irads + noise_array, yerr=airy_err,xerr=Irads, fmt='o')
+        plt.plot(airy_radius, airy_amp)
+    title = "UV integration times vs integration for %s" % (name)
+    plt.title(title)
+    plt.xlabel('Radius')
+    plt.ylabel("normalized amplitude")
+    plt.xlim(0, 180)
+    plt.ylim(0)
+    graph_saver(save_dir, title+"1D")
 
 def uv_tracks_plot(tel_tracks, veritas_tels, baselines, arcsec, save_dir):
     plt.figure(figsize=(18, 15))
@@ -50,7 +95,6 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_disk, arcsec, 
     plt.title(title, fontsize=18)
     plt.colorbar()
     graph_saver(save_dir, title)
-
 
 def uvtracks_amplitudes(tel_tracks, baselines, airy_func, arcsec, wavelength, save_dir, name, err):
     plt.figure(figsize=(28, 28))

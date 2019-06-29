@@ -7,12 +7,13 @@ from astropy.table import Table
 from astropy.table import Column as col
 from astropy.io import ascii
 import os
+from matplotlib import pyplot as plt
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
 def star_analysis(tel_array,ang_diam, wavelength):
     tel_tracks = [IItools.uv_tracks(lat=tel_array.telLat.to('rad').value,
                                     dec=tel_array.dec.to('rad').value,
-                                    hours=tel_array.sidereal_times.to('rad').value,
+                                    hours=tel_array.integration_times.to('rad').value,
                                     Bn=Bns,
                                     Be=Bew,
                                     Bu=Bud) for Bns, Bew, Bud in
@@ -113,7 +114,7 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
                                    m2=bmag,
                                    t1=tel_array.err_t1,
                                    t2=obs_t)
-    amp_err_ratio = np_covs[:,3]/amp_errs
+    amp_err_ratio = np_covs[:,3]/(amp_errs)
 
     data_table = Table([sim_id, col(good_ra, unit=u.hourangle), col(good_dec, unit=u.deg), col(good_diams, unit=u.mas),
                         np_covs[:,0], np_covs[:,1], np_covs[:,3], np_covs[:,4], good_mag_names, good_mags, cat_names, bmag,vmag,
@@ -186,7 +187,7 @@ def veritas_catalog_builder(veritas_array, wavelength = 410e-9 * u.m, cat_name="
 
 if __name__ == "__main__":
     print("Welcome to the VERITAS catalog builder. Please make sure you are running the catalog for the desire night.\n")
-    time = '2019-6-30 07:00:00'
+    time = '2019-12-30 07:00:00'
     cat_name = "veritasCatalog%s.dat"%(time)
     curdir = os.path.dirname(__file__)
     save_dir = os.path.join(curdir, "IIGraphs")
@@ -212,6 +213,94 @@ if __name__ == "__main__":
 
     baselines = IItools.array_baselines(veritas_baselines)
     [veritas_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
+
+    test = True
+    if test:
+        veritas_cat = ascii.read(cat_name)
+        ind_col = col(np.arange(np.alen(veritas_cat)), name="Index")
+        veritas_cat.add_column(ind_col, index=0)
+        veritas_cat.pprint(max_lines=-1, max_width=-1)
+        stop_sel = 'n'
+        selected_star = veritas_cat[12]
+
+
+
+        veritas_array.star_track(ra=selected_star["RA"] * u.hourangle,
+                                 dec=selected_star["DEC"] * u.deg)
+        tims = veritas_array.integration_times
+        from astropy.coordinates import Angle
+        veritas_array.modify_obs_times(np.min(tims), np.max(tims), Angle("0h30m"))
+        ang_diam = selected_star["ANGD"] * u.mas
+        star_name = selected_star["SIMID"]
+        star_mag = selected_star["BS_BMAG"]
+        guess_r = wavelength.to('m').value / ang_diam.to('rad').value
+        I_time = np.diff(veritas_array.integration_times)[0].value * u.h.to("s")
+        star_err = IItools.track_error(sig1=veritas_array.err_sig,
+                                       m1=veritas_array.err_mag,
+                                       m2=star_mag,
+                                       t1=veritas_array.err_t1,
+                                       t2=I_time)
+
+        tel_tracks, airy_disk, airy_func = star_analysis(tel_array=veritas_array,
+                                                         ang_diam=ang_diam,
+                                                         wavelength=wavelength)
+
+        tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
+                                                                                        airy_func=airy_func,
+                                                                                        err=star_err)
+
+
+        plt.figure(figsize=(28, 24))
+        plt.errorbar(x=tr_Irad, y=tr_Ints+tr_aerrs, fmt='o', yerr=np.full(np.alen(tr_Ints), star_err), xerr=tr_xerr,label="Model w/ err")
+        rsort = np.argsort(tr_rad)
+        plt.plot(tr_rad[rsort], tr_amp[rsort], '-', label="Actual Function")
+        # plt.figure(figsize=(28,24))
+        airy_r1D = np.linspace(0, np.max(tr_rad), np.alen(tr_rad))
+        airy_mod = IImodels.airy1D(airy_r1D, r=guess_r)
+        plt.plot(airy_r1D, airy_mod)
+        rIsort = np.argsort(tr_Irad)
+        airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rIsort],
+                                       airy_amp=tr_Ints[rIsort]+tr_aerrs[rIsort],
+                                       guess_r=guess_r,
+                                       errs=np.full(np.alen(tr_Ints), star_err))
+        fit_diam = (wavelength.to('m').value/airy_fitr[0] * u.rad).to('mas')
+        fit_err = np.sqrt(np.diag(airy_fiterr))[0]/airy_fitr[0] * fit_diam
+        plt.plot(airy_r1D, IImodels.airy1D(airy_r1D, airy_fitr[0]), label="Fitted Model")
+        plt.title("fit mas of data is %s +- %s or %.2f percent" % (fit_diam, fit_err, fit_err / fit_diam * 100), fontsize=28)
+        plt.legend()
+        # plt.show()
+
+        fitdiams = []
+        fiterrs = []
+        for i in range(0, 1000):
+            tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
+                                                                                       airy_func=airy_func,
+                                                                                       err=star_err)
+
+            rIsort = np.argsort(tr_Irad)
+            try:
+                airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rIsort],
+                                                             airy_amp=tr_Ints[rIsort] + tr_aerrs[rIsort],
+                                                             guess_r=guess_r,
+                                                             errs=np.full(np.alen(tr_Ints), star_err))
+            except Exception as e:
+                print(e)
+                continue
+            if np.abs(airy_fitr[0]) > guess_r*5 or airy_fiterr > guess_r*5:
+                print(airy_fitr[0])
+                continue
+            else:
+                fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('mas')
+                fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
+                fitdiams.append(fit_diam.value)
+                fiterrs.append(fit_err.value)
+            # print(i, end="")
+
+        plt.title("mean mas of 1000 fits is %s +- %.4f percent \n"
+                  "fiterr std is %.4f +- %.4f percent"
+                  % (np.mean(fitdiams), np.mean(fiterrs)/np.mean(fitdiams)*100, np.std(fiterrs), np.std(fiterrs)/np.mean(fiterrs)*100), fontsize=28)
+        plt.show()
+        abs=2323
 
     #Figure out if there is a catalog created already and/or if the user wants to create a catalog
     if cat_name in os.listdir():
@@ -240,7 +329,6 @@ if __name__ == "__main__":
     stop_sel = 'n'
 
 
-
     while stop_sel != 'q':
         try:
             index = int(input("Please enter the index of the star you want to analyze\n"))
@@ -250,13 +338,40 @@ if __name__ == "__main__":
             veritas_array.star_track(ra=selected_star["RA"]*u.hourangle,
                                      dec=selected_star["DEC"]*u.deg)
 
+            IIdisplay.changing_veritas_values(veritas_array, selected_star)
+
+
+
             ang_diam = selected_star["ANGD"] * u.mas
             star_name = selected_star["SIMID"]
-            star_err = selected_star["ErrAmp"]
+            star_mag = selected_star["BS_BMAG"]
+            I_time = np.diff(veritas_array.integration_times)[0].value*u.h.to("s")
+            star_err = IItools.track_error(sig1=veritas_array.err_sig,
+                                           m1=veritas_array.err_mag,
+                                           m2=star_mag,
+                                           t1=veritas_array.err_t1,
+                                           t2=I_time)
 
             tel_tracks, airy_disk, airy_func = star_analysis(tel_array=veritas_array,
                                                              ang_diam=ang_diam,
                                                              wavelength=wavelength)
+
+            IIdisplay.uvtracks_integrated(varray=veritas_array,
+                                          tel_tracks=tel_tracks,
+                                          airy_func=airy_func,
+                                          save_dir=save_dir,
+                                          name="%sIntegrationTime%.4f"%(star_name, I_time),
+                                          err=star_err,
+                                          noise=False)
+
+            IIdisplay.uvtracks_integrated(varray=veritas_array,
+                                          tel_tracks=tel_tracks,
+                                          airy_func=airy_func,
+                                          save_dir=save_dir,
+                                          name="%sIntegrationTimeWNoise%.4f"%(star_name, I_time),
+                                          err=star_err,
+                                          noise=True)
+
             IIdisplay.uvtracks_airydisk2D(tel_tracks=tel_tracks,
                                           veritas_tels=veritas_array,
                                           baselines=baselines,
@@ -266,14 +381,7 @@ if __name__ == "__main__":
                                           save_dir=save_dir,
                                           name=star_name,
                                           err=star_err)
-            IIdisplay.uvtracks_amplitudes(tel_tracks=tel_tracks,
-                                          baselines=baselines,
-                                          airy_func=airy_func,
-                                          arcsec=ang_diam,
-                                          wavelength=wavelength,
-                                          save_dir=save_dir,
-                                          name=star_name,
-                                          err=star_err)
+
             stop_sel = input("Do you wish to quit? Enter q to quit, anything else to coninue.")
         except Exception as e:
             print(e)
