@@ -11,6 +11,7 @@ import os
 from astroquery.vizier import Vizier
 Vizier.ROW_LIMIT = -1
 from astropy.coordinates import get_sun
+from scipy.stats import chisquare
 
 class IItelescope():
     def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500, mag_range=(-3,3), dec_range=(-20,90)):
@@ -57,6 +58,8 @@ class IItelescope():
         self.catalogs = []
         self.cat_names = []
 
+        self.tracked_stars = {}
+
 
     def modify_obs_times(self, start,end, int_time):
         wanted_times = (np.arange(start.to('rad').value, end.to('rad').value, Angle(int_time).to('rad').value)*u.rad).to('hourangle')
@@ -68,15 +71,11 @@ class IItelescope():
         self.Bnss.append(Bns)
         self.Buds.append(Bud)
 
-    def star_track(self, ra=None, dec=None, star_name=None, sunangle=-15, veritas_ang=20):
-        if star_name:
-            starToTrack = SkyCoord.from_name(star_name)
-            self.ra = starToTrack.ra
-            self.dec = starToTrack.dec
-        else:
-            self.ra = ra
-            self.dec = dec
-            starToTrack = SkyCoord(ra=ra, dec=dec)
+    def star_track(self, ra=None, dec=None, sunangle=-15, veritas_ang=20):
+
+        self.ra = ra
+        self.dec = dec
+        starToTrack = SkyCoord(ra=ra, dec=dec)
 
 
         starLoc = starToTrack.transform_to(self.telFrame)
@@ -90,6 +89,8 @@ class IItelescope():
         self.sidereal_times = self.telFrame.obstime.sidereal_time('apparent')[sky_ind] - starToTrack.ra
         self.integration_times = self.sidereal_times
         self.star_degs = starLoc.alt.to("deg")[sky_ind]
+
+        ra_dec = str(self.ra) + str(self.dec)
 
 
 

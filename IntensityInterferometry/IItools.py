@@ -6,6 +6,7 @@ from astropy.visualization import astropy_mpl_style
 import astropy.units as u
 from astropy.time import Time
 from astropy.coordinates import SkyCoord, EarthLocation, AltAz, GeocentricTrueEcliptic
+from IntensityInterferometry import IImodels
 
 def radial_profile(data, center=None):
     if center == None:
@@ -180,5 +181,34 @@ def getIntersection(interval_1, interval_2):
         return [st, end]
     return 0
 
+def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_r, wavelength, runs):
+    fitdiams = []
+    fiterrs = []
+    failed_fits = 0
+    for i in range(0, runs):
+        tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
+                                                                                   airy_func=airy_func,
+                                                                                   err=star_err)
+
+        rIsort = np.argsort(tr_Irad)
+        try:
+            airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rIsort],
+                                                         airy_amp=tr_Ints[rIsort] + tr_aerrs[rIsort],
+                                                         guess_r=guess_r + np.random.normal(0,guess_r/5),
+                                                         errs=np.full(np.alen(tr_Ints), star_err))
+        except Exception as e:
+            print(e)
+            continue
+        if np.abs(airy_fitr[0]) > guess_r * 15 or airy_fiterr > guess_r * 15:
+            failed_fits += 1
+            continue
+        else:
+            fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('mas')
+            fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
+            fitdiams.append(fit_diam.value)
+            fiterrs.append(fit_err.value)
+
+
+    return np.array(fitdiams), np.array(fiterrs), failed_fits
 
 

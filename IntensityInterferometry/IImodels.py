@@ -54,7 +54,8 @@ def fit_airy1D(rx,airy_amp, guess_r, errs, bounds=(-np.inf, np.inf)):
               p0=[guess_r],
               sigma=errs,
               bounds=bounds,
-                maxfev=1000)
+              maxfev=1000,
+              absolute_sigma=True)
 
     return popt, pcov
 

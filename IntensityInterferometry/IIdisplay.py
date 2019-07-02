@@ -2,31 +2,46 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import astropy.visualization as viz
 from astropy.coordinates import Angle
-from IntensityInterferometry import IItools
+from IntensityInterferometry import IItools, IImodels
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os
 
 
-def changing_veritas_values(varray, star):
-    times = varray.sidereal_times
-    name = star["SIMID"]
+def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, intTime, save_dir):
 
-    print("So current sideral observation times for %s are %s to %s, with integration times of %s"
-          %(name,np.min(times), np.max(times), times[1]-times[0]))
+    tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
+                                                                                    airy_func=airy_func,
+                                                                                    err=star_err)
+    rIsort = np.argsort(tr_Irad)
 
-    chng_ver_vals = input("Do you want to change these? y for yes, anything else for no.\n")
-    if chng_ver_vals.lower() == 'y':
-        while True:
-            try:
-                print("Make sure you enter your times in the exact same format as printed before like -> '.2h.2m.2s' unless you want unexpected behavior.\n")
-                mod_start = Angle(input("Please enter when you want the observation to start.\n"))
-                mod_end = Angle(input("Please enter when you want the observation to end.\n"))
-                integration_time = Angle(input("Please enter the integration time you desire IN THE SAME FORMAT\n"))
-                varray.modify_obs_times(mod_start, mod_end, integration_time)
-                break
-            except Exception as e:
-                print("Make sure you entered in the time in a format like %s and you chose a valid starting and end time"%(np.min(times)))
+    plt.figure(figsize=(28, 24))
+    plt.errorbar(x=tr_Irad,
+                 y=tr_Ints+tr_aerrs,
+                 fmt='o',
+                 yerr=np.full(np.alen(tr_Ints), star_err),
+                 xerr=tr_xerr,
+                 label="Model w/ err")
+    rsort = np.argsort(tr_rad)
+    plt.plot(tr_rad[rsort], tr_amp[rsort], '-', label="Actual Function")
+    # plt.figure(figsize=(28,24))
+    airy_r1D = np.linspace(0, np.max(tr_rad), np.alen(tr_rad))
+    airy_mod = IImodels.airy1D(airy_r1D, r=guess_r)
+    plt.plot(airy_r1D, airy_mod)
+    plt.plot(tr_Irad, tr_Ints, 'o', label="Acutal Integration")
+    airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rIsort],
+                                   airy_amp=tr_Ints[rIsort]+tr_aerrs[rIsort],
+                                   guess_r=guess_r,
+                                   errs=np.full(np.alen(tr_Ints), star_err))
+    fit_diam = (wavelength.to('m').value/airy_fitr[0] * u.rad).to('mas')
+    fit_err = np.sqrt(np.diag(airy_fiterr))[0]/airy_fitr[0] * fit_diam
+    plt.plot(airy_r1D, IImodels.airy1D(airy_r1D, airy_fitr[0]), label="Fitted Model")
+    title = "Star %s Integration time of %s\n fit mas of data is %s +- %s or %.2f percent" % (
+    star_name, intTime, fit_diam, fit_err, fit_err / fit_diam * 100)
+    plt.title(title, fontsize=28)
+    plt.legend()
+    graph_saver(save_dir, title+"1D")
+
 
 def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
     noise_array = 0
