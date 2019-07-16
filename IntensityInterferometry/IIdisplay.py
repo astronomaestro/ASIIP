@@ -44,6 +44,11 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
         star_name, intTime, fit_diam, fit_err, fit_err / fit_diam * 100)
     plt.title(title, fontsize=28)
     plt.legend(fontsize=28)
+    plt.xlabel("Meters", fontsize=22)
+    plt.ylabel("Amplitude", fontsize=22)
+    plt.tick_params(axis='both', which='major', labelsize=20)
+    plt.tick_params(axis='both', which='minor', labelsize=18)
+
     graph_saver(save_dir, title+"1D")
 
 
