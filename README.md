@@ -1,8 +1,7 @@
 # Intensity Interferometry Target Planner
 * What this target planner does
 
--A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for Veritas
-but can work with any Intensity Interferometry system. 
+-A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for VERITAS but can work with any Intensity Interferometry system. 
 
 -Queries 5 different catalogs with custom constraints defined by the user and constructs a master catalog from them. 
 It then cross checks found targets with the Bright Star Catalog and SIMBAD to obtain B magnitudes, radial velocities, 
