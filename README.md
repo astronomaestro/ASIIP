@@ -19,7 +19,7 @@ This Python script was written using Python 3.7, so a Python 2 compiler might no
 planner, open a terminal (or command prompt) and change your directory to where interferometer.py is located and then 
 type this
 
-    - python interferometer.py
+    python interferometer.py
 
 
 There are some package dependencies that you will need in order to get the script running.
@@ -63,7 +63,7 @@ IIparameters.json included with this package.
 In the event you want multiple parameter files or you want to change the name of your parameter file you can by running 
 the script like this
 
-     - python interferometer.py (name of your parameter file).json
+     python interferometer.py (name of your parameter file).json
 
 
 * How to interpret the results of the analysis
