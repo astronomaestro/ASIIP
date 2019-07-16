@@ -9,43 +9,47 @@ import os
 
 
 def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, intTime, save_dir):
-
-    tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
-                                                                                    airy_func=airy_func,
-                                                                                    err=star_err)
-    rIsort = np.argsort(tr_Irad)
-
-    plt.figure(figsize=(28, 24))
+    rads, amps, avgrad, avgamp = IImodels.avg_air1D(tel_tracks=tel_tracks,
+                                                    airy_func=airy_func,
+                                                    err=star_err)
+    yerr = np.random.normal(0, star_err, avgamp.shape)
+    rerr = np.random.normal(0, guess_r / 5)
+    airy_fitr, airy_fiterr, df, der, sig = IImodels.fit_airy_avg(rads=rads,
+                                                                 amps=amps,
+                                                                 avg_rads=avgrad,
+                                                                 avg_amps=avgamp + yerr,
+                                                                 func=airy_func,
+                                                                 err=star_err,
+                                                                 guess_r=guess_r + rerr,
+                                                                 real_r=guess_r)
+    fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('mas')
+    fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
+    tr_Irad = avgrad.ravel()
+    tr_Ints = avgamp.ravel()
+    tr_rad = rads.ravel()
+    tr_amp = amps.ravel()
+    rs = np.argsort(tr_rad)
+    plt.figure(figsize=(32, 20))
     plt.errorbar(x=tr_Irad,
-                 y=tr_Ints+tr_aerrs,
+                 y=tr_Ints + yerr.ravel(),
                  fmt='o',
                  yerr=np.full(np.alen(tr_Ints), star_err),
-                 xerr=tr_xerr,
-                 label="Model w/ err")
-    rsort = np.argsort(tr_rad)
-    plt.plot(tr_rad[rsort], tr_amp[rsort], '-', label="Actual Function")
-    # plt.figure(figsize=(28,24))
-    airy_r1D = np.linspace(0, np.max(tr_rad), np.alen(tr_rad))
-    airy_mod = IImodels.airy1D(airy_r1D, r=guess_r)
-    plt.plot(airy_r1D, airy_mod)
-    plt.plot(tr_Irad, tr_Ints, 'o', label="Acutal Integration")
-    airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rIsort],
-                                   airy_amp=tr_Ints[rIsort]+tr_aerrs[rIsort],
-                                   guess_r=guess_r,
-                                   errs=np.full(np.alen(tr_Ints), star_err))
-    fit_diam = (wavelength.to('m').value/airy_fitr[0] * u.rad).to('mas')
-    fit_err = np.sqrt(np.diag(airy_fiterr))[0]/airy_fitr[0] * fit_diam
-    plt.plot(airy_r1D, IImodels.airy1D(airy_r1D, airy_fitr[0]), label="Fitted Model")
+                 label="Model w/ err",
+                 linewidth=2)
+    plt.scatter(tr_Irad, tr_Ints, label="Acutal Integration", s=120, color="r")
+    plt.plot(tr_rad[rs], IImodels.airy1D(tr_rad, airy_fitr)[rs], linestyle="--", label="Fitted Airy Function",
+             linewidth=4)
+    plt.plot(tr_rad[rs], tr_amp[rs], '-', label="True Airy Function", linewidth=3)
     title = "Star %s Integration time of %s\n fit mas of data is %s +- %s or %.2f percent" % (
-    star_name, intTime, fit_diam, fit_err, fit_err / fit_diam * 100)
+        star_name, intTime, fit_diam, fit_err, fit_err / fit_diam * 100)
     plt.title(title, fontsize=28)
-    plt.legend()
+    plt.legend(fontsize=28)
     graph_saver(save_dir, title+"1D")
 
 
 def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
     noise_array = 0
-    nlen = np.alen(varray.integration_times)-1
+    nlen = np.alen(varray.star_dict[star_id]["IntTimes"])-1
     if noise:
         noise_array = np.random.normal(0,err,nlen)
     x_0 = airy_func.x_0.value

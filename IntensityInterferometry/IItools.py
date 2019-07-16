@@ -52,7 +52,6 @@ def array_baselines(tel_locs):
     for i in range(n):
         for j in range(1,n-i):
             baselines.append(tel_locs[i] - tel_locs[i+j])
-
     return baselines
 
 
@@ -112,12 +111,14 @@ def track_coverage(tel_tracks, airy_func):
     x_0 = airy_func.x_0.value
     y_0 = airy_func.y_0.value
     ranges = []
+    amps = []
     r_0 = airy_func.radius.value
     for i, track in enumerate(tel_tracks):
         utrack = track[0][:, 0] + x_0
         vtrack = track[0][:, 1] + y_0
-        # airy_amp = airy_func(utrack, vtrack)
+        airy_amp = airy_func(utrack, vtrack)
         airy_radius = np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2)
+        amps.append(airy_amp)
         ranges.append([np.min(airy_radius), np.max(airy_radius)])
 
     merged_ranges = interval_merger(ranges)
@@ -134,10 +135,9 @@ def track_coverage(tel_tracks, airy_func):
         r0_amp = curve_amplitude(merged_ranges,0,r_0,airy_func,x_0,y_0)
     if r1_cov > 0:
         r1_amp = curve_amplitude(merged_ranges,r_0,r_0*2,airy_func,x_0,y_0)
+    r_amp = np.ptp(amps)
 
-
-
-    return r0_cov/r_0, r1_cov/r_0, r2_cov/r_0, r0_amp, r1_amp
+    return r0_cov/r_0, r1_cov/r_0, r2_cov/r_0, r0_amp, r1_amp, r_amp
 
 def curve_amplitude(ranges, st, end, airy_func, x_0, y_0):
     r0_range = [getIntersection(rang, [st, end]) for rang in ranges if getIntersection(rang, [st, end]) is not 0]
@@ -147,8 +147,8 @@ def curve_amplitude(ranges, st, end, airy_func, x_0, y_0):
     low = airy_func(y_0, maxr + x_0)
     return high - low
 
-def track_error(sig1,m1,m2,t1,t2):
-    return sig1*(2.512)**(m2-m1) * (t1/t2)**.5
+def track_error(sig0, m0, m, t0, t):
+    return sig0 * (2.512) ** (m - m0) * (t0 / t) ** .5
 
 def trap_w_err(numerical_f, r, erra, errb):
     fa = numerical_f[:-1]
@@ -160,6 +160,20 @@ def trap_w_err(numerical_f, r, erra, errb):
     I = dr * C
     Ierr = dr*np.sqrt(erra**2 + errb*2)*C
     return I, Ierr, dr
+
+def trapezoidal_average(num_f):
+    if np.alen(num_f)>1:
+        fa = num_f[:-1]
+        fb = num_f[1:]
+        func_avg = (fa + fb)/2
+    else:
+        func_avg = np.mean(num_f)
+    return func_avg
+
+
+
+
+
 
 
 
@@ -184,21 +198,28 @@ def getIntersection(interval_1, interval_2):
 def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_r, wavelength, runs):
     fitdiams = []
     fiterrs = []
+    dfs = []
+    derrs = []
     failed_fits = 0
     for i in range(0, runs):
-        tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
-                                                                                   airy_func=airy_func,
-                                                                                   err=star_err)
+        rads, amps, avgrad, avgamp = IImodels.avg_air1D(tel_tracks=tel_tracks,
+                                                          airy_func=airy_func,
+                                                          err=star_err)
 
-        rIsort = np.argsort(tr_Irad)
-        try:
-            airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rIsort],
-                                                         airy_amp=tr_Ints[rIsort] + tr_aerrs[rIsort],
-                                                         guess_r=guess_r + np.random.normal(0,guess_r/5),
-                                                         errs=np.full(np.alen(tr_Ints), star_err))
-        except Exception as e:
-            print(e)
-            continue
+
+        airy_fitr, airy_fiterr, df,der, sigmas = IImodels.fit_airy_avg(rads=rads,
+                                     amps=amps,
+                                     avg_rads=avgrad,
+                                     avg_amps=avgamp + np.random.normal(0,star_err, avgamp.shape),
+                                     func=airy_func,
+                                     err=star_err,
+                                     guess_r=guess_r+ np.random.normal(0,guess_r/5),
+                                     real_r=guess_r)
+        # airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rsort],
+        #                                              airy_amp=tr_Ints[rsort] + tr_aerrs[rsort],
+        #                                              guess_r=guess_r + np.random.normal(0,guess_r/5),
+        #                                              errs=np.full(np.alen(tr_Ints), star_err))
+
         if np.abs(airy_fitr[0]) > guess_r * 15 or airy_fiterr > guess_r * 15:
             failed_fits += 1
             continue
@@ -207,8 +228,14 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_r, wavelength, r
             fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
             fitdiams.append(fit_diam.value)
             fiterrs.append(fit_err.value)
+            dfs.append(((wavelength.to('m').value / df[0] * u.rad).to('mas')).value)
 
-
+    try:
+        smartfiterr = np.mean(fitdiams)/((wavelength.to('m').value / guess_r * u.rad).to('mas')).value
+        airyfiterr = np.mean(dfs)/((wavelength.to('m').value / guess_r * u.rad).to('mas')).value
+        print("smartfiterr %s, airyfit %s"%(smartfiterr, airyfiterr))
+    except:
+        print('everything failed')
     return np.array(fitdiams), np.array(fiterrs), failed_fits
 
 

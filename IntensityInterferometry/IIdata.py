@@ -9,12 +9,16 @@ import json
 from astropy.io import fits, ascii
 import os
 from astroquery.vizier import Vizier
+from IntensityInterferometry import IItools
 Vizier.ROW_LIMIT = -1
 from astropy.coordinates import get_sun
 from scipy.stats import chisquare
+from astropy.table import Table
+from astropy.table import Column as col
 
 class IItelescope():
-    def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500, mag_range=(-3,3), dec_range=(-20,90)):
+    def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500,
+                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0)):
 
         self.Bews = []
         self.Bnss = []
@@ -34,8 +38,6 @@ class IItelescope():
         self.err_mag = m1
         self.err_t1 = t1
 
-        self.observable_times = None
-        self.sidereal_times = None
         self.star_degs = None
         self.time_info = None
 
@@ -49,21 +51,26 @@ class IItelescope():
         self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
         dark_times = np.where((self.sunaltazs.alt < -15*u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
-        self.integration_times = self.dark_times
 
         #the hour_correction is to shift the sky to include stars that have just barely risen
-        hour_correction = 6 * u.hourangle
+        hour_correction = 4 * u.hourangle
         #calculate the possible ra range of the telescope for the given night
-        self.ra_range = ((self.dark_times.min() - hour_correction).to('deg').value, self.dark_times.max().to('deg').value)
+        if ra_range:
+            self.ra_range = ra_range
+        else:
+            self.ra_range = ((self.dark_times[0] - hour_correction).to('deg').value, (self.dark_times[-1] + hour_correction).to('deg').value)
+        if self.ra_range[0] > self.ra_range[1]:
+            self.ra_range = self.ra_range[::-1]
+
         self.catalogs = []
         self.cat_names = []
 
-        self.tracked_stars = {}
+        self.star_dict = {}
 
 
     def modify_obs_times(self, start,end, int_time):
         wanted_times = (np.arange(start.to('rad').value, end.to('rad').value, Angle(int_time).to('rad').value)*u.rad).to('hourangle')
-        self.integration_times = wanted_times
+        self.star_dict[star_id]["IntTimes"] = wanted_times
 
 
     def add_baseline(self, Bew, Bns, Bud):
@@ -71,10 +78,9 @@ class IItelescope():
         self.Bnss.append(Bns)
         self.Buds.append(Bud)
 
-    def star_track(self, ra=None, dec=None, sunangle=-15, veritas_ang=20):
+    def star_track(self, ra=None, dec=None, sunangle=-15, veritas_ang=20, obs_start=None, obs_end=None, Itime = 1800*u.s):
 
-        self.ra = ra
-        self.dec = dec
+        ra_dec = str(ra) + str(dec)
         starToTrack = SkyCoord(ra=ra, dec=dec)
 
 
@@ -83,14 +89,33 @@ class IItelescope():
 
         sky_ind = np.where((self.sunaltazs.alt < sunangle*u.deg) & (starLoc.alt > veritas_ang*u.deg))[0]
         observable_times = self.delta_time[sky_ind]
+        if np.alen(observable_times)==0:
+            if ra_dec not in self.star_dict:self.star_dict[ra_dec] = {}
+            self.star_dict[ra_dec]["ObsTimes"] = np.nan
+            return 0
+        mintime = np.min(observable_times)
+        maxtime = np.max(observable_times)
+        if not obs_start: obs_start = mintime
+        if not obs_end: obs_end = maxtime
+
+        if ra_dec not in self.star_dict:
+            self.star_dict[ra_dec] = {}
+            self.star_dict[ra_dec]["RA"] = ra
+            self.star_dict[ra_dec]["DEC"] = dec
+            self.star_dict[ra_dec]["ObsTimes"] = observable_times
+            self.star_dict[ra_dec]["SideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind] - starToTrack.ra
+            self.observable_times = observable_times
 
 
-        self.observable_times = observable_times
-        self.sidereal_times = self.telFrame.obstime.sidereal_time('apparent')[sky_ind] - starToTrack.ra
-        self.integration_times = self.sidereal_times
-        self.star_degs = starLoc.alt.to("deg")[sky_ind]
+        time_overlap = IItools.getIntersection([obs_start.to('h').value, obs_end.to('h').value],
+                                               [mintime.to('h').value,maxtime.to('h').value])
+        if time_overlap:
+            self.star_dict[ra_dec]["IntTimes"] = np.arange(time_overlap[0], time_overlap[1], Itime.to('h').value)*u.hour
+            self.star_dict[ra_dec]["IntDelt"] = Itime.to('h')
+        else:
+            self.star_dict[ra_dec]["IntTimes"] = None
+            self.star_dict[ra_dec]["IntDelt"] = None
 
-        ra_dec = str(self.ra) + str(self.dec)
 
 
 
@@ -99,10 +124,12 @@ class IItelescope():
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         print("Retrieving Catalogue")
+        Vizier.query_constraints_async()
         result = v.query_constraints(catalog="I/345/gaia2",
                                      Gmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
+
         asdf=123
 
         good_vals = np.where(~np.isnan(result[0]['Rad']))
@@ -119,8 +146,9 @@ class IItelescope():
         print("Retrieving Catalogue")
         result = v.query_constraints(catalog="II/224",
                                      Vmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
+
 
         good_val = np.where(~np.isnan(result[0]['Diam']))
         self.cadars = result[0][good_val]
@@ -137,8 +165,9 @@ class IItelescope():
 
         result = v.query_constraints(catalog="J/A+A/431/773",
                                      Bmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
+
         good_val = np.where(~np.isnan(result[0]['UD']))
         self.charm2 = result[0][good_val]
         self.catalogs.append(self.charm2)
@@ -153,8 +182,9 @@ class IItelescope():
 
         result = v.query_constraints(catalog="II/346/jsdc_v2",
                                      Bmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
+
         good_val = np.where(~np.isnan(result[0]['Dis']))
         self.jmmc = result[0][good_val]
         self.catalogs.append(self.jmmc)
@@ -168,8 +198,9 @@ class IItelescope():
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         result = v.query_constraints(catalog="V/50",
-                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
+
         bs_cat = result[0]
         good_ind = np.where((bs_cat["RAJ2000"] != "") | (bs_cat["DEJ2000"] != ""))
         # RAJ2000 = Angle(bs_cat["RAJ2000"][good_ind], u.hourangle)
@@ -192,8 +223,9 @@ class IItelescope():
 
         result = v.query_constraints(catalog="J/AJ/156/102",
                                      Vmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
+
         good_val = np.where(~np.isnan(result[0]['R_']) & ~np.isnan(result[0]['Dist']))
 
         self.tess = result[0][good_val]

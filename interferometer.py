@@ -1,5 +1,6 @@
 from IntensityInterferometry import IImodels, IIdisplay, IItools, IIdata
 import numpy as np
+import numba as nu
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 import astropy.visualization as viz
@@ -14,22 +15,20 @@ import json
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
 
-def deep_star_analysis(star, boot_runs = 100):
+def deep_star_analysis(star, star_id, boot_runs = 100, I_time = 1800*u.s):
     ang_diam = star["ANGD"] * u.mas
     star_name = star["SIMID"]
-    star_mag = star["BS_BMAG"]
+    star_mag = star["SimBMAG"]
     guess_r = wavelength.to('m').value / ang_diam.to('rad').value
-    I_time = np.diff(veritas_array.integration_times)[1].value * u.h.to("s")
 
-    star_err = IItools.track_error(sig1=veritas_array.err_sig,
-                                   m1=veritas_array.err_mag,
-                                   m2=star_mag,
-                                   t1=veritas_array.err_t1,
-                                   t2=I_time)
+    star_err = IItools.track_error(sig0=veritas_array.err_sig,
+                                   m0=veritas_array.err_mag,
+                                   m=star_mag,
+                                   t0=veritas_array.err_t1,
+                                   t=I_time.value)
 
-    tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=veritas_array,
-                                                       ang_diam=ang_diam,
-                                                       wavelength=wavelength)
+    tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=veritas_array, ang_diam=ang_diam,
+                                                       wavelength=wavelength, star_id=star_id)
 
     fitdiams, fiterrs, failed_fits = IItools.IIbootstrap_analysis(tel_tracks=tel_tracks,
                                                                   airy_func=airy_func,
@@ -46,10 +45,13 @@ def deep_star_analysis(star, boot_runs = 100):
     print("%s: mean mas of 1000 fits is %s +- %.4f percent.\tfiterr std is %.4f +- %.4f percent with %s failed fits"
           % (star_name, fdiam_mean, ferr_mean / fdiam_mean * 100, ferr_std,
              ferr_std / ferr_mean * 100, failed_fits))
-    return fdiam_mean, ferr_mean, ferr_std, failed_fits
+    reg_analysis = [tel_tracks, airy_func, star_err]
+    boot_analysis = [fdiam_mean, ferr_mean, ferr_std, failed_fits]
+    return boot_analysis, reg_analysis
 
 def changing_veritas_values(varray, star):
-    times = varray.sidereal_times
+    star_id = str(star["RA"]) + str(star["DEC"])
+    times = varray.star_dict[star_id]["SideTimes"]
     name = star["SIMID"]
 
     print("So current sideral observation times for %s are %s to %s, with integration times of %s"
@@ -63,15 +65,19 @@ def changing_veritas_values(varray, star):
                 mod_start = Angle(input("Please enter when you want the observation to start.\n"))
                 mod_end = Angle(input("Please enter when you want the observation to end.\n"))
                 integration_time = Angle(input("Please enter the integration time you desire IN THE SAME FORMAT\n"))
+
+                #TODO fix this
                 varray.modify_obs_times(mod_start, mod_end, integration_time)
                 break
             except Exception as e:
                 print("Make sure you entered in the time in a format like %s and you chose a valid starting and end time"%(np.min(times)))
 
-def star_airy_track(tel_array, ang_diam, wavelength):
+def star_airy_track(tel_array, ang_diam, wavelength, star_id):
+    hour_angle_rad = Angle(tel_array.star_dict[star_id]["IntTimes"]).to('rad').value
+    dec_angle_rad = tel_array.star_dict[star_id]["DEC"].to('rad').value
     tel_tracks = [IItools.uv_tracks(lat=tel_array.telLat.to('rad').value,
-                                    dec=tel_array.dec.to('rad').value,
-                                    hours=tel_array.integration_times.to('rad').value,
+                                    dec=dec_angle_rad,
+                                    hours=hour_angle_rad,
                                     Bn=Bns,
                                     Be=Bew,
                                     Bu=Bud) for Bns, Bew, Bud in
@@ -84,7 +90,7 @@ def star_airy_track(tel_array, ang_diam, wavelength):
                                                 wavelength=wavelength)
     return tel_tracks, airy_disk, airy_func
 
-def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=None):
+def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=None):
     coverages=[]
     good_diams = []
     good_ra = []
@@ -97,7 +103,6 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
     tracks = []
     airy_funcs = []
     total_obs_times = []
-    chis = []
     coords_done = SkyCoord([(0*u.deg,0*u.deg)])
     i = 0
     for catalog, cat_name in zip(tel_array.catalogs, tel_array.cat_names):
@@ -117,41 +122,42 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
             else:
                 print('|', end="")
                 continue
+            star_id = str(ra) + str(dec)
             tel_array.star_track(ra=ra, dec=dec)
-            if np.alen(tel_array.observable_times) > 0:
-                total_obs_time = np.ptp(tel_array.observable_times)
 
-            if total_obs_time < cutoff_obs_time * u.hour:
+            if tel_array.star_dict[star_id]["ObsTimes"]:
+                if np.alen(tel_array.star_dict[star_id]["ObsTimes"]) > 1:
+                    total_obs_time = np.ptp(tel_array.star_dict[star_id]["ObsTimes"])
+                else: total_obs_time=0*u.hour
+
+            if total_obs_time <= cutoff_obs_time * u.hour:
                 print("Skipping star RA %s DEC %s as it is observable only %s" % (ra, dec, total_obs_time))
                 continue
 
-
+            if i== 14:
+                asdf=123
             i = i+1
-            # if i== 36:
-            #     asdf=123
-            tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=tel_array,
-                                                               ang_diam=ang_diam,
-                                                               wavelength=wavelength)
 
-            r0_percent, r1_percent, r2_percent, r0_amp, r1_amp = IItools.track_coverage(tel_tracks=tel_tracks,
+            tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=tel_array, ang_diam=ang_diam,
+                                                               wavelength=wavelength, star_id=star_id)
+
+            r0_percent, r1_percent, r2_percent, r0_amp, r1_amp, r_amp = IItools.track_coverage(tel_tracks=tel_tracks,
                                                                                         airy_func=airy_func)
 
-            star_err = IItools.track_error(sig1=tel_array.err_sig,
-                                           m1=tel_array.err_mag,
-                                           m2=mag,
-                                           t1=tel_array.err_t1,
-                                           t2=obs_t)
-            tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D(tel_tracks=tel_tracks,
-                                                                                       airy_func=airy_func,
-                                                                                       err=star_err)
+            star_err = IItools.track_error(sig0=tel_array.err_sig,
+                                           m0=tel_array.err_mag,
+                                           m=mag,
+                                           t0=tel_array.err_t1,
+                                           t=obs_t)
+            tr_amp, tr_rad, tr_Ints, tr_Irad, tr_aerrs, tr_xerr = IImodels.airy_disk1D_Integration(tel_tracks=tel_tracks,
+                                                                                                   airy_func=airy_func,
+                                                                                                   err=star_err)
 
-            rIsort = np.argsort(tr_Irad)
-            chi = chisquare(tr_Ints[rIsort] + tr_aerrs[rIsort], tr_Ints[rIsort])[0]
 
             if r0_percent > .95:
                 asdf=23
 
-            coverages.append([r0_percent,r1_percent,r2_percent, r0_amp, r1_amp])
+            coverages.append([r0_percent,r1_percent,r2_percent, r0_amp, r1_amp, r_amp])
             good_diams.append(ang_diam.to("mas").value)
             good_ra.append(ra.value)
             good_dec.append(dec.value)
@@ -161,7 +167,7 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
             total_obs_times.append(total_obs_time.to('s').value)
             tracks.append(tel_tracks)
             airy_funcs.append(airy_func)
-            chis.append(chi)
+            # chis.append(chi)
     np_covs = np.array(coverages)
 
     bs_mat, bs_dis, bs_3dis = SkyCoord(good_ra, good_dec,
@@ -181,21 +187,21 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0.5, obs_t=N
         obs_t = np.array(total_obs_times)
     else:
         obs_t = np.full(np.alen(total_obs_times),obs_t)
-    amp_errs = IItools.track_error(sig1=tel_array.err_sig,
-                                   m1=tel_array.err_mag,
-                                   m2=bmag,
-                                   t1=tel_array.err_t1,
-                                   t2=obs_t)
+    amp_errs = IItools.track_error(sig0=tel_array.err_sig,
+                                   m0=tel_array.err_mag,
+                                   m=bmag,
+                                   t0=tel_array.err_t1,
+                                   t=obs_t)
     amp_err_ratio = np_covs[:,3]/(amp_errs)
 
     data_table = Table([sim_id, col(good_ra, unit=u.hourangle), col(good_dec, unit=u.deg), col(good_diams, unit=u.mas),
-                        np_covs[:,0], np_covs[:,1], np_covs[:,3], np_covs[:,4], good_mag_names, good_mags, cat_names, bmag,vmag,
+                        np_covs[:,0], np_covs[:,1], np_covs[:,5], good_mag_names, good_mags, cat_names, bmag,vmag,
                         bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"], sim_bflux, sim_sptype, simd.to('mas'), sim_rotV,
-                        col(amp_errs),col(total_obs_times, unit=u.second), col(obs_t, unit=u.second), amp_err_ratio, col(chis)],
+                        col(amp_errs),col(total_obs_times, unit=u.second), col(obs_t, unit=u.second), amp_err_ratio],
                        names=("SIMID","RA","DEC","ANGD",
-                              "R0COV","R1COV","R0AMP","R1AMP","FILT","MAG","CAT","BS_BMAG","BS_VMAG",
+                              "R0COV","R1COV","RAMP","FILT","MAG","CAT","BS_BMAG","BS_VMAG",
                               "BSSkyD", "BSSpT", "BSRV","SimBMAG", "SIMSpT", "SIMSkyD", "SIMRV",
-                              "ErrAmp", "TotObsTime", "ObsTime", "AmpErrRatio", "chiSquare"))
+                              "ErrAmp", "TotObsTime", "ObsTime", "AmpErrRatio"))
     return data_table, np.array(tracks), np.array(airy_funcs)
 
 def catalog_builder(veritas_array, wavelength =410e-9 * u.m, cat_name="veritasCatalog"):
@@ -257,82 +263,142 @@ def catalog_builder(veritas_array, wavelength =410e-9 * u.m, cat_name="veritasCa
 
 if __name__ == "__main__":
     print("Welcome to the VERITAS catalog builder. Please make sure you are running the catalog for the desire night.\n")
-    with open("IIparameters.json") as param:
-        #I use json as it is clear from the file itself what the variables are.
-        IIparam = json.load(param)
-        #The time is meant to be midnight on the day that you are observing. Make sure you correct for your timezone and daylight savings
-        time = IIparam["time"]
-        #this is the name of the output save file
-        cat_name = "veritasCatalog%s.dat"%(time)
-        curdir = os.path.dirname(__file__)
-        #this is the directory where all analysis graphs will be saved.
-        save_dir = os.path.join(curdir, "IIGraphs")
+    try:
+        with open("IIparameters.json") as param:
+            #I use json as it is clear from the file itself what the variables are.
+            IIparam = json.load(param)
+            #The time is meant to be midnight on the day that you are observing. Make sure you correct for your timezone and daylight savings
+            time = IIparam["time"]
+            ra_range = IIparam["raRange"]
+            dec_range = IIparam["decRange"]
+            mag_range = IIparam["magRange"]
 
-        #The wavelength of your filter
-        wavelength = IIparam["wavelength"] * u.m
+            #this is the name of the output save file
+            cat_name = "veritasCatalog%smag%sto%s.dat"%(time, mag_range[0], mag_range[1])
+            curdir = os.path.dirname(__file__)
+            #this is the directory where all analysis graphs will be saved.
+            save_dir = os.path.join(curdir, "IIGraphs")
 
-        #locations of all the different VERITAS telescopes relative to each other, used to construct the baselines
-        veritas_baselines = IIparam["telLocs"]
-        int_time = IIparam["integrationTime"]
-        # steps details how fine you want the baseline graphs to be, fewer steps means faster processing but less detail in the models
-        steps = IIparam['steps']
+            #The wavelength of your filter
+            wavelength = IIparam["wavelength"] * u.m
+
+            #locations of all the different VERITAS telescopes relative to each other, used to construct the baselines
+            veritas_baselines = np.array(IIparam["telLocs"])
 
 
-        #The latitude, longitude, and elevation of the center point of your array
-        veritas_telLat = IIparam["telLat"]
-        veritas_telLon = IIparam["telLon"]
-        veritas_telElv = IIparam["telElv"]
-        #How many bootstrapping runs you want to do per target. If it is
-        boot_runs = IIparam["bootStrapRuns"]
-        skip_prompts = IIparam["skipScript"]
+            #THESE SHOULD BE DEFINED IN HOURS AND ONLY FRACTIONS OF HOURS, 0 is defined as midnight
+            int_time = IIparam["integrationTime"] * u.h
+
+            if ~np.isnan(np.array(IIparam["observationStart"]).astype(float)): obs_start = IIparam["observationStart"]*u.h
+            else: obs_start = IIparam["observationStart"]
+
+            if ~np.isnan(np.array(IIparam["observationEnd"]).astype(float)): obs_end = IIparam["observationEnd"]*u.h
+            else: obs_end = IIparam["observationEnd"]
+
+            # steps details how fine you want the baseline graphs to be, fewer steps means faster processing but less detail in the models
+            steps = 600
+
+
+            #The latitude, longitude, and elevation of the center point of your array
+            veritas_telLat = IIparam["telLat"]
+            veritas_telLon = IIparam["telLon"]
+            veritas_telElv = IIparam["telElv"]
+            #How many bootstrapping runs you want to do per target.
+            boot_runs = IIparam["bootStrapRuns"]
+            skip_script = IIparam["skipScript"]
+            make_graphs = IIparam["makeGraphs"]
+
+            #The pre-determined values to calculate your error
+            sigma_tel = IIparam["sigmaTel"]
+            sigma_mag = IIparam["sigmaMag"]
+            sigma_time = IIparam["sigmaTime"]
+
+
+
+    except Exception as e:
+        print(e)
+        print("So the parameters could not be read in correctly. Make sure you have formatted your parameter file correctly, "
+              "that you have named it correctly and it's located in the same directory as the script. "
+              "Default parameter file name is IIparameters.json")
+        raise e
+
 
     veritas_array = IIdata.IItelescope(telLat=veritas_telLat,
                                        telLon=veritas_telLon,
                                        telElv=veritas_telElv,
                                        time=time,
-                                       steps=steps)
+                                       steps=steps,
+                                       sig1=sigma_tel,
+                                       m1=sigma_mag,
+                                       t1=sigma_time,
+                                       mag_range=mag_range,
+                                       dec_range=dec_range,
+                                       ra_range=ra_range)
 
     baselines = IItools.array_baselines(veritas_baselines)
     [veritas_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
 
     #allows for quicker running when set to true by skipping script prompts and setting them to values which are given
-    #within the code itself
-    if skip_prompts:
-        print("Skipping script prompts and running the analysis with default values.")
-        veritas_cat = ascii.read(cat_name)
-        ind_col = col(np.arange(np.alen(veritas_cat)), name="Index")
-        veritas_cat.add_column(ind_col, index=0)
+    #within the IIparameters.json file
+    if skip_script:
+        print("Skipping script prompts and running analysis.")
+        if cat_name in os.listdir():
+            print("Catalog %s has been found and will be used"%(cat_name))
+            veritas_cat = ascii.read(cat_name)
+        else:
+            print("No catalog %s found, creating a new catalog."%(cat_name))
+            catalog_builder(veritas_array=veritas_array,
+                            wavelength=wavelength,
+                            cat_name=cat_name)
+            veritas_cat = ascii.read(cat_name)
+
+        if "Index" not in veritas_cat.colnames:
+            ind_col = col(np.arange(np.alen(veritas_cat)), name="Index")
+            veritas_cat.add_column(ind_col, index=0)
         veritas_cat.pprint(max_lines=-1, max_width=-1)
         stop_sel = 'n'
 
         deep_analysis = []
+        reg_analysis = []
         for selected_star in veritas_cat:
-            veritas_array.star_track(ra=selected_star["RA"] * u.hourangle,
-                                     dec=selected_star["DEC"] * u.deg)
+            ra = selected_star["RA"] * u.hourangle
+            dec = selected_star["DEC"] * u.deg
+            if 'eps Vir' in selected_star["SIMID"]:
+                asdf=234
+            veritas_array.star_track(ra=ra,
+                                     dec=dec,
+                                     obs_start=obs_start,
+                                     obs_end=obs_end,
+                                     Itime=int_time)
+            star_id = str(ra) + str(dec)
+
+            I_time = veritas_array.star_dict[star_id]["IntDelt"]
 
 
-            tims = veritas_array.integration_times
-            obs_start = np.min(tims)
-            obs_end = np.max(tims)
-            veritas_array.modify_obs_times(start=obs_start,
-                                           end=obs_end,
-                                           int_time=Angle(int_time))
-
-            fitdiam_mean, fiterr_mean, fiterr_std, failed_fits = deep_star_analysis(star=selected_star,
-                                                                                    boot_runs=boot_runs)
-            deep_analysis.append([fitdiam_mean, fiterr_mean, fiterr_std, failed_fits])
-            abs=2323
+            if I_time:
+                deep_anal, reg_anal = deep_star_analysis(star=selected_star, star_id=star_id, boot_runs=boot_runs, I_time=I_time.to('s'))
+                deep_analysis.append(deep_anal)
+                reg_analysis.append(reg_anal)
+                abs=2323
+            else:
+                print("For your selected times %s to %s, the star %s cannot be observed"%(obs_start, obs_end, selected_star["SIMID"]))
+                deep_analysis.append([np.nan, np.nan, np.nan, np.nan])
+                reg_analysis.append([np.nan,np.nan,np.nan])
 
 
         deep_analysis = np.array(deep_analysis)
+        reg_analysis = np.array(reg_analysis)
         diam_percent_err = deep_analysis[:,1]/deep_analysis[:,0]
         err_of_diam_err = deep_analysis[:,2]/deep_analysis[:,1]
-        veritas_cat.add_column(col(deep_analysis[:,0], name="MeanDiamFit", format="%.4f"))
-        veritas_cat.add_column(col(diam_percent_err, name="PercentDiamFitErr", format="%.4f"))
-        veritas_cat.add_column(col(err_of_diam_err, name="PercentErrOfDiamFitErr", format="%.4f"))
-        veritas_cat.add_column(col(deep_analysis[:,3] / boot_runs, name="PercentOfFailedFits", format="%.4f"))
+
+        if "MeanDiamFit" not in veritas_cat.colnames:
+            veritas_cat.add_column(col(deep_analysis[:,0], name="MeanDiamFit", format="%.4f"))
+            veritas_cat.add_column(col(diam_percent_err, name="PercentDiamFitErr", format="%.4f"))
+            veritas_cat.add_column(col(err_of_diam_err, name="PercentErrOfDiamFitErr", format="%.4f"))
+            veritas_cat.add_column(col(deep_analysis[:,3] / boot_runs, name="PercentOfFailedFits", format="%.4f"))
 
         lowerr = np.argsort(veritas_cat, order=["PercentOfFailedFits","PercentDiamFitErr"])
+        rasort = np.argsort(veritas_cat, order=["RA"])
         veritas_cat[lowerr].pprint(max_lines=-1, max_width=-1)
 
 
@@ -343,97 +409,107 @@ if __name__ == "__main__":
 
         asdqwer=1239
 
+        n = 3
+        guess_r = (wavelength.to('m').value / (veritas_cat[n]["ANGD"]*u.mas).to('rad').value)
+        IIdisplay.uvtrack_model_run(tel_tracks=reg_analysis[n][0],
+                                    airy_func=reg_analysis[n][1],
+                                    star_err=reg_analysis[n][2],
+                                    guess_r=guess_r,
+                                    wavelength= wavelength,
+                                    star_name=veritas_cat[n]["SIMID"],
+                                    intTime=I_time,
+                                    save_dir=save_dir)
 
-    #If skip_prompts is false, ask the user what values they desire to be analyzed
-    else:
-        veritas_cat = None
-        #Figure out if there is a catalog created already and/or if the user wants to create a catalog
-        if cat_name in os.listdir():
-            while not veritas_cat:
-                response = input("It seems you have a catalog called %s, do you wish to use it? y or n\n"%(cat_name))
-                if response == 'y':
-                    veritas_cat = ascii.read(cat_name)
-                elif response == "n":
-                    print("Creating new catalog")
-                    catalog_builder(veritas_array=veritas_array,
-                                    wavelength=wavelength,
-                                    cat_name=cat_name)
-                    veritas_cat = ascii.read(cat_name)
-                else:
-                    print("You have to type y for yes or n for no.\n")
-        else:
-            print("No catalog found for time %s, creating a new catalog."%(time))
-            catalog_builder(veritas_array=veritas_array,
-                            wavelength=wavelength,
-                            cat_name=cat_name)
-            veritas_cat = ascii.read(cat_name)
-
-        ind_col = col(np.arange(np.alen(veritas_cat)), name="Index")
-        veritas_cat.add_column(ind_col, index=0)
-        veritas_cat.pprint(max_lines=-1, max_width=-1)
-        stop_sel = 'n'
-
-
-        while stop_sel != 'q':
-            try:
-                index = int(input("Please enter the index of the star you want to analyze\n"))
-                selected_star = veritas_cat[index]
-                print("\nNow analyzing your selected star\n%s\n"%(selected_star))
-
-                veritas_array.star_track(ra=selected_star["RA"]*u.hourangle,
-                                         dec=selected_star["DEC"]*u.deg)
-
-                changing_veritas_values(veritas_array, selected_star)
-
-
-
-                ang_diam = selected_star["ANGD"] * u.mas
-                star_name = selected_star["SIMID"]
-                star_mag = selected_star["BS_BMAG"]
-                I_time = np.diff(veritas_array.integration_times)[0].value*u.h.to("s")
-                star_err = IItools.track_error(sig1=veritas_array.err_sig,
-                                               m1=veritas_array.err_mag,
-                                               m2=star_mag,
-                                               t1=veritas_array.err_t1,
-                                               t2=I_time)
-
-                tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=veritas_array,
-                                                                   ang_diam=ang_diam,
-                                                                   wavelength=wavelength)
-
-                IIdisplay.uvtracks_integrated(varray=veritas_array,
-                                              tel_tracks=tel_tracks,
-                                              airy_func=airy_func,
-                                              save_dir=save_dir,
-                                              name="%sIntegrationTime%.4f"%(star_name, I_time),
-                                              err=star_err,
-                                              noise=False)
-
-                IIdisplay.uvtracks_integrated(varray=veritas_array,
-                                              tel_tracks=tel_tracks,
-                                              airy_func=airy_func,
-                                              save_dir=save_dir,
-                                              name="%sIntegrationTimeWNoise%.4f"%(star_name, I_time),
-                                              err=star_err,
-                                              noise=True)
-
-                IIdisplay.uvtracks_airydisk2D(tel_tracks=tel_tracks,
-                                              veritas_tels=veritas_array,
-                                              baselines=baselines,
-                                              airy_disk=airy_disk,
-                                              arcsec=ang_diam,
-                                              wavelength=wavelength,
-                                              save_dir=save_dir,
-                                              name=star_name,
-                                              err=star_err)
-
-                stop_sel = input("Do you wish to quit? Enter q to quit, anything else to coninue.")
-            except Exception as e:
-                print(e)
-                print("You must enter a valid index. If a star has an index of 0 and you want to analyze it, enter in a 0")
-
-        possible_plots = ["UV tracks overlay with airydisk"]
-        asdf=123
+    # #If skip_prompts is false, ask the user what values they desire to be analyzed
+    # else:
+    #     veritas_cat = None
+    #     #Figure out if there is a catalog created already and/or if the user wants to create a catalog
+    #     if cat_name in os.listdir():
+    #         while not veritas_cat:
+    #             response = input("It seems you have a catalog called %s, do you wish to use it? y or n\n"%(cat_name))
+    #             if response == 'y':
+    #                 veritas_cat = ascii.read(cat_name)
+    #             elif response == "n":
+    #                 print("Creating new catalog")
+    #                 catalog_builder(veritas_array=veritas_array,
+    #                                 wavelength=wavelength,
+    #                                 cat_name=cat_name)
+    #                 veritas_cat = ascii.read(cat_name)
+    #             else:
+    #                 print("You have to type y for yes or n for no.\n")
+    #     else:
+    #         print("No catalog found for time %s, creating a new catalog."%(time))
+    #         catalog_builder(veritas_array=veritas_array,
+    #                         wavelength=wavelength,
+    #                         cat_name=cat_name)
+    #         veritas_cat = ascii.read(cat_name)
+    #
+    #     ind_col = col(np.arange(np.alen(veritas_cat)), name="Index")
+    #     veritas_cat.add_column(ind_col, index=0)
+    #     veritas_cat.pprint(max_lines=-1, max_width=-1)
+    #     stop_sel = 'n'
+    #
+    #
+    #     while stop_sel != 'q':
+    #         try:
+    #             index = int(input("Please enter the index of the star you want to analyze\n"))
+    #             selected_star = veritas_cat[index]
+    #             print("\nNow analyzing your selected star\n%s\n"%(selected_star))
+    #
+    #             veritas_array.star_track(ra=selected_star["RA"]*u.hourangle,
+    #                                      dec=selected_star["DEC"]*u.deg)
+    #
+    #             changing_veritas_values(veritas_array, selected_star)
+    #
+    #
+    #
+    #             ang_diam = selected_star["ANGD"] * u.mas
+    #             star_name = selected_star["SIMID"]
+    #             star_mag = selected_star["BS_BMAG"]
+    #             I_time = np.diff(veritas_array.star_dict[star_id]["IntTimes"])[0].value*u.h.to("s")
+    #             star_err = IItools.track_error(sig1=veritas_array.err_sig,
+    #                                            m1=veritas_array.err_mag,
+    #                                            m2=star_mag,
+    #                                            t1=veritas_array.err_t1,
+    #                                            t2=I_time)
+    #             star_id = str(selected_star["RA"]) + str(selected_star["DEC"])
+    #
+    #             tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=veritas_array, ang_diam=ang_diam,
+    #                                                                wavelength=wavelength, star_id=star_id)
+    #
+    #             IIdisplay.uvtracks_integrated(varray=veritas_array,
+    #                                           tel_tracks=tel_tracks,
+    #                                           airy_func=airy_func,
+    #                                           save_dir=save_dir,
+    #                                           name="%sIntegrationTime%.4f"%(star_name, I_time),
+    #                                           err=star_err,
+    #                                           noise=False)
+    #
+    #             IIdisplay.uvtracks_integrated(varray=veritas_array,
+    #                                           tel_tracks=tel_tracks,
+    #                                           airy_func=airy_func,
+    #                                           save_dir=save_dir,
+    #                                           name="%sIntegrationTimeWNoise%.4f"%(star_name, I_time),
+    #                                           err=star_err,
+    #                                           noise=True)
+    #
+    #             IIdisplay.uvtracks_airydisk2D(tel_tracks=tel_tracks,
+    #                                           veritas_tels=veritas_array,
+    #                                           baselines=baselines,
+    #                                           airy_disk=airy_disk,
+    #                                           arcsec=ang_diam,
+    #                                           wavelength=wavelength,
+    #                                           save_dir=save_dir,
+    #                                           name=star_name,
+    #                                           err=star_err)
+    #
+    #             stop_sel = input("Do you wish to quit? Enter q to quit, anything else to coninue.")
+    #         except Exception as e:
+    #             print(e)
+    #             print("You must enter a valid index. If a star has an index of 0 and you want to analyze it, enter in a 0")
+    #
+    #     possible_plots = ["UV tracks overlay with airydisk"]
+    #     asdf=123
 
 
 
@@ -472,7 +548,7 @@ asfadsf=1234123
 # veritas_array.star_track(ra=selected_star["RA"] * u.hourangle,
 #                          dec=selected_star["DEC"] * u.deg)
 #
-# tims = veritas_array.integration_times
+# tims = veritas_array.star_dict[star_id]["IntTimes"]
 # obs_start = np.min(tims)
 # obs_end = np.max(tims)
 # veritas_array.modify_obs_times(start=obs_start - 0*u.hourangle,
@@ -483,7 +559,7 @@ asfadsf=1234123
 # star_name = selected_star["SIMID"]
 # star_mag = selected_star["BS_BMAG"]
 # guess_r = wavelength.to('m').value / ang_diam.to('rad').value
-# I_time = np.diff(veritas_array.integration_times)[1].value * u.h.to("s")
+# I_time = np.diff(veritas_array.star_dict[star_id]["IntTimes"])[1].value * u.h.to("s")
 #
 # star_err = IItools.track_error(sig1=veritas_array.err_sig,
 #                                m1=veritas_array.err_mag,
