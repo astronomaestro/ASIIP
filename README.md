@@ -1,5 +1,5 @@
-#Intensity Interferometry Target Planner
-*What this target planner does
+# Intensity Interferometry Target Planner
+* What this target planner does
 
 -A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for Veritas
 but can work with any Intensity Interferometry system. 
