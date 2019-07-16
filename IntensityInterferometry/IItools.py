@@ -5,8 +5,11 @@ import matplotlib.pyplot as plt
 from astropy.visualization import astropy_mpl_style
 import astropy.units as u
 from astropy.time import Time
-from astropy.coordinates import SkyCoord, EarthLocation, AltAz, GeocentricTrueEcliptic
 from IntensityInterferometry import IImodels
+from astroquery.vizier import Vizier
+
+
+
 
 def radial_profile(data, center=None):
     if center == None:
@@ -169,12 +172,6 @@ def trapezoidal_average(num_f):
     else:
         func_avg = np.mean(num_f)
     return func_avg
-
-
-
-
-
-
 
 
 def interval_merger(intervals):

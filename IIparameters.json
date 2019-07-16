@@ -1,6 +1,6 @@
 {
-  "time": "2019-8-21 07:00:00",
-  "raRange": [0,0],
+  "time": "2019-8-24 07:00:00",
+  "raRange": [0,360],
   "decRange": [-20,90],
   "magRange": [-4,2],
   "wavelength": 410e-9,
@@ -14,7 +14,5 @@
   "sigmaTel": 0.11,
   "sigmaMag": 1.7,
   "sigmaTime": 800,
-  "bootStrapRuns": 100,
-  "skipScript": true,
-  "makeGraphs": true
+  "bootStrapRuns": 100
 }

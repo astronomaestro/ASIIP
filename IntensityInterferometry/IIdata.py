@@ -2,19 +2,15 @@ import numpy as np
 import matplotlib.pyplot as plt
 import astropy.units as u
 from astropy.time import Time
-from astropy.coordinates import SkyCoord, EarthLocation, AltAz, GeocentricTrueEcliptic, Angle
-import astroquery
-ar = np.array
-import json
-from astropy.io import fits, ascii
+from astropy.coordinates import SkyCoord, EarthLocation, AltAz, Angle
+from astropy.io import ascii
 import os
 from astroquery.vizier import Vizier
 from IntensityInterferometry import IItools
-Vizier.ROW_LIMIT = -1
 from astropy.coordinates import get_sun
-from scipy.stats import chisquare
-from astropy.table import Table
-from astropy.table import Column as col
+Vizier.ROW_LIMIT = -1
+
+
 
 class IItelescope():
     def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500,
@@ -47,7 +43,6 @@ class IItelescope():
         self.telFrame = AltAz(obstime=self.time_info + self.delta_time, location=self.tel_loc)
 
         #get indicies for when sky is dark
-        from astropy.coordinates import get_sun
         self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
         dark_times = np.where((self.sunaltazs.alt < -15*u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
@@ -66,11 +61,6 @@ class IItelescope():
         self.cat_names = []
 
         self.star_dict = {}
-
-
-    def modify_obs_times(self, start,end, int_time):
-        wanted_times = (np.arange(start.to('rad').value, end.to('rad').value, Angle(int_time).to('rad').value)*u.rad).to('hourangle')
-        self.star_dict[star_id]["IntTimes"] = wanted_times
 
 
     def add_baseline(self, Bew, Bns, Bud):
@@ -127,7 +117,7 @@ class IItelescope():
         Vizier.query_constraints_async()
         result = v.query_constraints(catalog="I/345/gaia2",
                                      Gmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         asdf=123
@@ -139,14 +129,14 @@ class IItelescope():
         self.cat_names.append("GAIA")
 
 
-    def make_cadars_query(self, from_database=True, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100), load_vizier=True):
+    def make_cadars_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
         columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag']
         v = Vizier()
         v.ROW_LIMIT = -1
         print("Retrieving Catalogue")
         result = v.query_constraints(catalog="II/224",
                                      Vmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
 
@@ -165,7 +155,7 @@ class IItelescope():
 
         result = v.query_constraints(catalog="J/A+A/431/773",
                                      Bmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         good_val = np.where(~np.isnan(result[0]['UD']))
@@ -182,7 +172,7 @@ class IItelescope():
 
         result = v.query_constraints(catalog="II/346/jsdc_v2",
                                      Bmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         good_val = np.where(~np.isnan(result[0]['Dis']))
@@ -198,7 +188,7 @@ class IItelescope():
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         result = v.query_constraints(catalog="V/50",
-                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         bs_cat = result[0]
@@ -223,7 +213,7 @@ class IItelescope():
 
         result = v.query_constraints(catalog="J/AJ/156/102",
                                      Vmag='>%s & <%s' %(mag_range[0], mag_range[1]),
-                                     RAJ2000="<%s || >%s"%(ra_range[0], ra_range[1]),
+                                     RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         good_val = np.where(~np.isnan(result[0]['R_']) & ~np.isnan(result[0]['Dist']))
