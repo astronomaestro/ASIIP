@@ -1,8 +1,7 @@
 # Intensity Interferometry Target Planner
 * What this target planner does
 
--A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for Veritas
-but can work with any Intensity Interferometry system. 
+-A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for VERITAS but can work with any Intensity Interferometry system. 
 
 -Queries 5 different catalogs with custom constraints defined by the user and constructs a master catalog from them. 
 It then cross checks found targets with the Bright Star Catalog and SIMBAD to obtain B magnitudes, radial velocities, 
@@ -19,7 +18,7 @@ This Python script was written using Python 3.7, so a Python 2 compiler might no
 planner, open a terminal (or command prompt) and change your directory to where interferometer.py is located and then 
 type this
 
-    - python interferometer.py
+    python interferometer.py
 
 
 There are some package dependencies that you will need in order to get the script running.
@@ -63,7 +62,7 @@ IIparameters.json included with this package.
 In the event you want multiple parameter files or you want to change the name of your parameter file you can by running 
 the script like this
 
-     - python interferometer.py (name of your parameter file).json
+     python interferometer.py (name of your parameter file).json
 
 
 * How to interpret the results of the analysis
