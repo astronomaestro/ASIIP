@@ -342,21 +342,20 @@ if __name__ == "__main__":
 
     deep_analysis = np.array(deep_analysis)
     reg_analysis = np.array(reg_analysis)
-    diam_percent_err = deep_analysis[:,1]/deep_analysis[:,0]
-    err_of_diam_err = deep_analysis[:,2]/deep_analysis[:,1]
+    diam_percent_err = deep_analysis[:,1]/deep_analysis[:,0]*100
+    err_of_diam_err = deep_analysis[:,2]/deep_analysis[:,1]*100
 
     if "MeanDiamFit" not in veritas_cat.colnames:
-        veritas_cat.add_column(col(deep_analysis[:,0], name="MeanDiamFit", format="%.4f"))
-        veritas_cat.add_column(col(diam_percent_err, name="PerDiamErr", format="%.4f"))
-        veritas_cat.add_column(col(err_of_diam_err, name="PerErrDiamFitErr", format="%.4f"))
-        veritas_cat.add_column(col(deep_analysis[:,3] / boot_runs, name="PerFailFit", format="%.4f"))
+        veritas_cat.add_column(col(deep_analysis[:,0], name="MeanDiamFit", format="%.2f"))
+        veritas_cat.add_column(col(diam_percent_err, name="PerDiamErr", format="%.2f"))
+        veritas_cat.add_column(col(err_of_diam_err, name="PerErrDiamFitErr", format="%.2f"))
+        veritas_cat.add_column(col(deep_analysis[:,3] / boot_runs * 100, name="PerFailFit", format="%.2f"))
 
     lowerr = np.argsort(veritas_cat, order=["PerFailFit","PerDiamErr"])
     rasort = np.argsort(veritas_cat, order=["RA"])
     veritas_cat[lowerr].pprint(max_lines=-1, max_width=-1)
 
 
-    deep_analysis = np.array(deep_analysis)
     fit_failures = deep_analysis[:,3]
     not_complete_failures = np.where(np.array(fit_failures) < boot_runs / 4)
 
@@ -368,14 +367,37 @@ if __name__ == "__main__":
         try:
             n = int(response)
             guess_r = (wavelength.to('m').value / (veritas_cat[n]["ANGD"]*u.mas).to('rad').value)
-            IIdisplay.uvtrack_model_run(tel_tracks=reg_analysis[n][0],
-                                        airy_func=reg_analysis[n][1],
-                                        star_err=reg_analysis[n][2],
+            star_tracks = reg_analysis[n][0]
+            star_func = reg_analysis[n][1]
+            star_err = reg_analysis[n][2]
+            star_name = str.strip(veritas_cat[n]["SIMID"], "* ")
+            star_save = os.path.join(save_dir, star_name)
+            IIdisplay.uvtrack_model_run(tel_tracks=star_tracks,
+                                        airy_func=star_func,
+                                        star_err=star_err,
                                         guess_r=guess_r,
                                         wavelength= wavelength,
-                                        star_name=veritas_cat[n]["SIMID"],
-                                        intTime=I_time,
-                                        save_dir=save_dir)
+                                        star_name=star_name,
+                                        ITime=I_time,
+                                        save_dir=star_save,
+                                        fullAiry=False)
+            IIdisplay.uvtrack_model_run(tel_tracks=star_tracks,
+                                        airy_func=star_func,
+                                        star_err=star_err,
+                                        guess_r=guess_r,
+                                        wavelength= wavelength,
+                                        star_name=star_name,
+                                        ITime=I_time,
+                                        save_dir=star_save,
+                                        fullAiry=True)
+            IIdisplay.uvtracks_airydisk2D(tel_tracks=star_tracks,
+                                          veritas_tels=veritas_array,
+                                          baselines=baselines,
+                                          airy_func=star_func,
+                                          guess_r=guess_r,
+                                          wavelength=wavelength,
+                                          save_dir=star_save,
+                                          star_name=star_name)
         except Exception as e:
             print(e)
             print("Make sure to enter a valid response\n")

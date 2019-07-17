@@ -8,7 +8,8 @@ import numpy as np
 import os
 
 
-def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, intTime, save_dir):
+
+def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, fullAiry=False):
     rads, amps, avgrad, avgamp = IImodels.avg_air1D(tel_tracks=tel_tracks,
                                                     airy_func=airy_func,
                                                     err=star_err)
@@ -34,23 +35,61 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
                  y=tr_Ints + yerr.ravel(),
                  fmt='o',
                  yerr=np.full(np.alen(tr_Ints), star_err),
-                 label="Model w/ err",
+                 label="Simulated Data",
                  linewidth=2)
     plt.scatter(tr_Irad, tr_Ints, label="Acutal Integration", s=120, color="r")
     plt.plot(tr_rad[rs], IImodels.airy1D(tr_rad, airy_fitr)[rs], linestyle="--", label="Fitted Airy Function",
              linewidth=4)
-    plt.plot(tr_rad[rs], tr_amp[rs], '-', label="True Airy Function", linewidth=3)
-    title = "Star %s Integration time of %s\n fit mas of data is %s +- %s or %.2f percent" % (
-        star_name, intTime, fit_diam, fit_err, fit_err / fit_diam * 100)
+
+    if fullAiry:
+        full_x = np.linspace(start=0,
+                             stop=np.max(tr_rad)+5,
+                             num=1000)
+        full_y = IImodels.airy1D(full_x, guess_r)
+        plt.plot(full_x, full_y, '-', label="True Airy Function", linewidth=3)
+        title = "Star %s Integration time of %s\n fit mas is %s +- %s or %.2f percent all" % (
+            star_name, ITime, fit_diam, fit_err, fit_err / fit_diam * 100)
+
+    else:
+        plt.plot(tr_rad[rs], tr_amp[rs], '-', label="True Airy Function", linewidth=3)
+        title = "Star %s Integration time of %s\n fit mas of data is %s +- %s or %.2f percent" % (
+            star_name, ITime, fit_diam, fit_err, fit_err / fit_diam * 100)
     plt.title(title, fontsize=28)
     plt.legend(fontsize=28)
     plt.xlabel("Meters", fontsize=22)
-    plt.ylabel("Amplitude", fontsize=22)
+    plt.ylabel("Visibility^2", fontsize=22)
     plt.tick_params(axis='both', which='major', labelsize=20)
     plt.tick_params(axis='both', which='minor', labelsize=18)
 
     graph_saver(save_dir, title+"1D")
 
+def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r, wavelength, save_dir, star_name):
+    x_0 = airy_func.x_0.value
+    y_0 = airy_func.y_0.value
+    y, x = np.mgrid[:x_0 * 2, :y_0 * 2]
+    airy_disk = airy_func(x, y)
+    plt.figure(figsize=(28, 28))
+    plt.imshow(airy_disk,
+               norm=viz.ImageNormalize(1, stretch=viz.LogStretch()),
+               extent=[-x_0, x_0, -y_0, y_0],
+               cmap='Accent_r')
+    for i, track in enumerate(tel_tracks):
+        plt.plot(track[0][:, 0], track[0][:, 1], linewidth=4, color='w')
+        plt.text(track[0][:, 0][5], track[0][:, 1][5], "Baseline %s" % (baselines[i]), fontsize=14, color='w')
+        plt.plot(track[1][:, 0], track[1][:, 1], linewidth=4, color='w')
+        plt.text(track[1][:, 0][5], track[1][:, 1][5], "Baseline %s" % (-baselines[i]), fontsize=14, color='w')
+    starttime = veritas_tels.time_info.T + veritas_tels.observable_times[0]
+    endtime = veritas_tels.time_info.T + veritas_tels.observable_times[-1]
+    title = "UV plane coverage of %s wavelength %s, %s mas Airy Disk" % (
+        star_name, wavelength, guess_r * wavelength.value)
+    plt.title(title, fontsize=28)
+    plt.xlabel("U (meters)", fontsize=22)
+    plt.ylabel("V (meters)", fontsize=22)
+    plt.tick_params(axis='both', which='major', labelsize=20)
+    plt.tick_params(axis='both', which='minor', labelsize=18)
+
+    plt.colorbar()
+    graph_saver(save_dir, title)
 
 def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
     noise_array = 0
@@ -77,6 +116,8 @@ def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise
     plt.ylim(0)
     graph_saver(save_dir, title+"1D")
 
+
+
 def uv_tracks_plot(tel_tracks, veritas_tels, baselines, arcsec, save_dir):
     plt.figure(figsize=(18, 15))
     plt.tight_layout()
@@ -94,30 +135,6 @@ def uv_tracks_plot(tel_tracks, veritas_tels, baselines, arcsec, save_dir):
     plt.ylabel("V (meters)")
     title = "UV plane coverage at times \n %s to %s of %s and %s" % (starttime.T, endtime.T, arcsec, wavelength)
     plt.title(title, fontsize=18)
-    graph_saver(save_dir, title)
-
-
-
-def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_disk, arcsec, wavelength, save_dir, name, err):
-    half_xlen = np.alen(airy_disk[0]) / 2
-    half_ylen = np.alen(airy_disk[1]) / 2
-
-    plt.figure(figsize=(28, 28))
-    plt.imshow(airy_disk,
-               norm=viz.ImageNormalize(1, stretch=viz.LogStretch()),
-               extent=[-half_xlen, half_xlen, -half_ylen, half_ylen])
-    for i, track in enumerate(tel_tracks):
-        plt.plot(track[0][:, 0], track[0][:, 1], linewidth=4, color='r')
-        plt.text(track[0][:, 0][5], track[0][:, 1][5], "Baseline %s" % (baselines[i]), fontsize=14, color='gray')
-        plt.plot(track[1][:, 0], track[1][:, 1], linewidth=4, color='r')
-        plt.text(track[1][:, 0][5], track[1][:, 1][5], "Baseline %s" % (-baselines[i]), fontsize=14, color='gray')
-    starttime = veritas_tels.time_info.T + veritas_tels.observable_times[0] - 6 * u.hour
-    endtime = veritas_tels.time_info.T + veritas_tels.observable_times[-1] - 6 * u.hour
-    plt.xlabel("U (meters)", fontsize=22)
-    plt.ylabel("V (meters)", fontsize=22)
-    title = "UV plane coverage of %s at %s and %s Airy Disk at times \n %s to %s" % (name, wavelength,arcsec, starttime.T, endtime.T)
-    plt.title(title, fontsize=18)
-    plt.colorbar()
     graph_saver(save_dir, title)
 
 def uvtracks_amplitudes(tel_tracks, baselines, airy_func, arcsec, wavelength, save_dir, name, err):
