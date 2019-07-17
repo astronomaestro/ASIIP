@@ -1,7 +1,10 @@
 import numpy as np
 from astropy.modeling.models import custom_model
 import astropy.visualization as viz
-from IntensityInterferometry import IImodels, IIdisplay, IItools, IIdata
+from II import IImodels, IIdisplay, IItools, IIdata
+from scipy.optimize import curve_fit
+from scipy.special import j1, jn_zeros
+
 from matplotlib import pyplot as plt
 
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
@@ -16,7 +19,6 @@ def sine_deriv(x, amplitude=1., frequency=1.):
 SineModel = custom_model(sine_model, fit_deriv=sine_deriv)
 
 def cust_airy_disk2D(x, y, x_0, y_0, theta, wavelength):
-    from scipy.special import j1, jn_zeros
     rz = jn_zeros(1, 1)[0] / np.pi
 
     radius = 1.22 * wavelength / theta
@@ -40,14 +42,12 @@ def airy_disk2D(shape, xpos, ypos, arcsec, wavelength):
     return airy_init(x,y), airy_init
 
 def airy1D(xr, r):
-    from scipy.special import j1
     con = 1.2196698912665045
     airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
     return airy_mod
 
 
 def fit_airy1D(rx,airy_amp, guess_r, errs, bounds=(-np.inf, np.inf)):
-    from scipy.optimize import curve_fit
 
     popt, pcov = curve_fit(f=airy1D,
               xdata=rx,
@@ -102,8 +102,6 @@ def avg_air1D(tel_tracks, airy_func, err):
 
 def fit_airy_avg(rads, amps, avg_rads, avg_amps, func, err, guess_r, real_r):
 
-    from scipy.optimize import curve_fit
-    from scipy.optimize import least_squares
     def airy_avg(xr,r):
         mod_Int = np.array([IItools.trapezoidal_average(airy1D(rad, r)) for rad in rads])
         return mod_Int.ravel()

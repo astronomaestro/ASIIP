@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import astropy.visualization as viz
 from astropy.coordinates import Angle
-from IntensityInterferometry import IItools, IImodels
+from II import IItools, IImodels
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os

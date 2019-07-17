@@ -6,7 +6,7 @@ from astropy.coordinates import SkyCoord, EarthLocation, AltAz, Angle
 from astropy.io import ascii
 import os
 from astroquery.vizier import Vizier
-from IntensityInterferometry import IItools
+from II import IItools
 from astropy.coordinates import get_sun
 Vizier.ROW_LIMIT = -1
 
@@ -68,7 +68,7 @@ class IItelescope():
         self.Bnss.append(Bns)
         self.Buds.append(Bud)
 
-    def star_track(self, ra=None, dec=None, sunangle=-15, veritas_ang=20, obs_start=None, obs_end=None, Itime = 1800*u.s):
+    def star_track(self, ra=None, dec=None, sunangle=-15, alt_cut=20, obs_start=None, obs_end=None, Itime =1800 * u.s):
 
         ra_dec = str(ra) + str(dec)
         starToTrack = SkyCoord(ra=ra, dec=dec)
@@ -77,7 +77,7 @@ class IItelescope():
         starLoc = starToTrack.transform_to(self.telFrame)
 
 
-        sky_ind = np.where((self.sunaltazs.alt < sunangle*u.deg) & (starLoc.alt > veritas_ang*u.deg))[0]
+        sky_ind = np.where((self.sunaltazs.alt < sunangle*u.deg) & (starLoc.alt > alt_cut * u.deg))[0]
         observable_times = self.delta_time[sky_ind]
         if np.alen(observable_times)==0:
             if ra_dec not in self.star_dict:self.star_dict[ra_dec] = {}

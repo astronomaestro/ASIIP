@@ -1,4 +1,4 @@
-from IntensityInterferometry import IImodels, IIdisplay, IItools, IIdata
+from II import IImodels, IIdisplay, IItools, IIdata
 import numpy as np
 import astropy.units as u
 from astropy.coordinates import SkyCoord
@@ -100,7 +100,9 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
                 print('|', end="")
                 continue
             star_id = str(ra) + str(dec)
-            tel_array.star_track(ra=ra, dec=dec)
+            tel_array.star_track(ra=ra,
+                                 dec=dec,
+                                 alt_cut=alt_cut)
 
             if tel_array.star_dict[star_id]["ObsTimes"]:
                 if np.alen(tel_array.star_dict[star_id]["ObsTimes"]) > 1:
@@ -225,6 +227,8 @@ if __name__ == "__main__":
             ra_range = IIparam["raRange"]
             dec_range = IIparam["decRange"]
             mag_range = IIparam["magRange"]
+            #specifies the lowest altitude your observatory can observe
+            alt_cut = IIparam["altitudeCutoff"]
 
             #this is the name of the output save file
             cat_name = "veritasCatalog%smag%sto%s.dat"%(time, mag_range[0], mag_range[1])
@@ -316,6 +320,7 @@ if __name__ == "__main__":
             asdf=234
         veritas_array.star_track(ra=ra,
                                  dec=dec,
+                                 alt_cut=alt_cut,
                                  obs_start=obs_start,
                                  obs_end=obs_end,
                                  Itime=int_time)

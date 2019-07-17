@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from astropy.visualization import astropy_mpl_style
 import astropy.units as u
 from astropy.time import Time
-from IntensityInterferometry import IImodels
+from II import IImodels
 from astroquery.vizier import Vizier
 
 

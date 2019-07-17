@@ -1,5 +1,5 @@
 {
-  "time": "2019-8-24 07:00:00",
+  "time": "2019-12-12 07:00:00",
   "raRange": [0,360],
   "decRange": [-20,90],
   "magRange": [-4,2],
@@ -9,6 +9,7 @@
   "telLat": 31.675,
   "telLon": -110.952,
   "telElv": 1268,
+  "altitudeCutoff": 20,
   "observationStart": null,
   "observationEnd": null,
   "sigmaTel": 0.11,
