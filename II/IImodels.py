@@ -21,7 +21,7 @@ SineModel = custom_model(sine_model, fit_deriv=sine_deriv)
 def cust_airy_disk2D(x, y, x_0, y_0, theta, wavelength):
     rz = jn_zeros(1, 1)[0] / np.pi
 
-    radius = 1.22 * wavelength / theta
+    radius = wavelength / theta
 
     r = np.sqrt((x - x_0) ** 2 + (y - y_0) ** 2) / (radius / rz)
 
@@ -43,22 +43,10 @@ def airy_disk2D(shape, xpos, ypos, arcsec, wavelength):
 
 def airy1D(xr, r):
     con = 1.2196698912665045
+    # con = 1
     airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
     return airy_mod
 
-
-def fit_airy1D(rx,airy_amp, guess_r, errs, bounds=(-np.inf, np.inf)):
-
-    popt, pcov = curve_fit(f=airy1D,
-              xdata=rx,
-              ydata=airy_amp,
-              p0=[guess_r],
-              sigma=errs,
-              bounds=bounds,
-              maxfev=1000,
-              absolute_sigma=True)
-
-    return popt, pcov
 
 def airy_disk1D_Integration(tel_tracks, airy_func, err):
     amps = []
@@ -106,14 +94,6 @@ def fit_airy_avg(rads, amps, avg_rads, avg_amps, func, err, guess_r, real_r):
         mod_Int = np.array([IItools.trapezoidal_average(airy1D(rad, r)) for rad in rads])
         return mod_Int.ravel()
 
-
-    # x = np.linspace(0, 100, 100000)
-    # n=5
-    # plt.figure(figsize=(24, 18))
-    # plt.plot(x, airy1D(x, guess_r))
-    # plt.plot(avg_rads.ravel(), airy_avg(rads,guess_r).ravel(), 'o')
-    # plt.plot(rads.ravel(), amps.ravel(), 'o')
-
     sigmas = np.full(np.alen(avg_amps.ravel()), err)
     try:
         smartFit, serr = curve_fit(f=airy_avg,
@@ -135,8 +115,6 @@ def fit_airy_avg(rads, amps, avg_rads, avg_amps, func, err, guess_r, real_r):
     except:
         avgp, avgerr = np.nan
 
-
-    # print("integralFit%s, airyFit%s, actual_r%s"%(smartFit[0]/real_r, avgp[0]/real_r, real_r))
 
     return smartFit, serr, avgp, avgerr, sigmas
 

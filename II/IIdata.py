@@ -290,7 +290,7 @@ class IItelescope():
             mag_name = "Gmag"
             mag = star[mag_name]
 
-        return ra,dec,ang_diam,mag,mag_name
+        return ra,dec,ang_diam*1.22,mag,mag_name
 
     def track_error(self,sig1,m1,m2,t1,t2):
         return sig1*(2.512)**(m2-m1) * (t1/t2)**.5

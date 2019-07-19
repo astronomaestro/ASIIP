@@ -41,9 +41,10 @@ def deep_star_analysis(star, star_id, boot_runs = 100, I_time = 1800*u.s):
     ferr_std = np.std(fiterrs)
 
 
-    print("%s: mean mas of 1000 fits is %s +- %.4f percent.\tfiterr std is %.4f +- %.4f percent with %s failed fits"
-          % (star_name, fdiam_mean, ferr_mean / fdiam_mean * 100, ferr_std,
-             ferr_std / ferr_mean * 100, failed_fits))
+    # print("%s: mean mas of 1000 fits is %s +- %.4f percent.\tfiterr std is %.4f +- %.4f percent with %s failed fits"
+    #       % (star_name, fdiam_mean, ferr_mean / fdiam_mean * 100, ferr_std,
+    #          ferr_std / ferr_mean * 100, failed_fits))
+    print("Completed %s"%(str.strip(star_name, '* ')))
     reg_analysis = [tel_tracks, airy_func, star_err]
     boot_analysis = [fdiam_mean, ferr_mean, ferr_std, failed_fits]
     return boot_analysis, reg_analysis
@@ -70,6 +71,7 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
     tablenames = ("RA","DEC","ANGD","FILT","MAG","CAT","TotObsTime")
     dtype = (np.float, np.float, np.float, np.unicode, np.float, np.unicode, np.float)
     dtable = Table(names=tablenames, dtype=dtype)
+    c = 0
 
     good_diams = []
     good_ra = []
@@ -80,14 +82,28 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
     good_mag_names = []
     cat_names = []
     total_obs_times = []
+    dup_count = []
     coords_done = SkyCoord([(0*u.deg,0*u.deg)])
     i = 0
     for catalog, cat_name in zip(tel_array.catalogs, tel_array.cat_names):
         ras, decs, ang_diams, mags, mag_name = tel_array.ra_dec_diam_getter(cat_name, catalog)
         pos_cat=SkyCoord(ras,decs)
+
+        #match pos_cat to the closest star in coords_done returning the closest coords_done indicies
         closest_star, skydis, distance3d = pos_cat.match_to_catalog_sky(coords_done)
+
+        #the indicies where the matched pos_cat star is large enough to be considered a unique star
         clo_idx = skydis > 1 * u.arcsec
-        coords_done = SkyCoord([c.data for c in pos_cat[clo_idx]] + [c.data for c in coords_done])
+
+        #the indicies of pos_cat which are under 1 arcsec and are considered a duplicate
+        dup_idx = np.where(~clo_idx)
+
+        #the indicies of the full catalog that has the duplicate value
+        dup_star = closest_star[dup_idx]
+
+        coords_done = SkyCoord([c.data for c in coords_done] + [c.data for c in pos_cat[clo_idx]])
+
+
 
         for ra,dec,ang_diam, mag in zip(ras[clo_idx], decs[clo_idx], ang_diams[clo_idx], mags[clo_idx]):
             total_obs_time = 0 * u.hour
@@ -98,6 +114,8 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
                 print("\nAnalyzing Star RA %s DEC %s at %s" % (ra, dec, i))
             else:
                 print('|', end="")
+                c=c+1
+
                 continue
             star_id = str(ra) + str(dec)
             tel_array.star_track(ra=ra,
@@ -125,6 +143,14 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
             good_mags.append(mag)
             cat_names.append(cat_name)
             total_obs_times.append(total_obs_time.to('s').value)
+            dup_count.append([ang_diam.value])
+
+        if np.alen(dup_star) > 0:
+            try:
+                for mcati, ccati in zip(dup_star, dup_idx[0]):
+                    dup_count[mcati].append(ang_diams[ccati].value)
+            except Exception as e:
+                print(e,c)
 
     bs_mat, bs_dis, bs_3dis = SkyCoord(good_ra, good_dec,
                                        unit=(u.hourangle, u.deg)).match_to_catalog_sky(
@@ -362,7 +388,7 @@ if __name__ == "__main__":
 
     asdqwer=1239
 
-    response = 0
+    response = input("\nEnter an index you wish to make graphs of or enter 'q' to quit\n")
     while(response!='q'):
         try:
             n = int(response)
