@@ -14,6 +14,58 @@ import sys
 norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
 
+def parallel_star_analysis(star, star_info, wavelength, err_sig, err_mag, err_t1, danal,ranal,i, boot_runs = 100, I_time = 1800*u.s):
+    if not I_time:
+        print("For your selected times, the star %s cannot be observed" % (star["SIMID"]))
+        deepfail = np.array([np.nan, np.nan, np.nan, np.nan])
+        # regfail = np.array([np.nan, np.nan, np.nan])
+        danal[i] = deepfail
+        # ranal[i] = regfail
+
+    else:
+        ang_diam = star["ANGD"] * u.mas
+        star_name = star["SIMID"]
+        star_mag = star["SimBMAG"]
+        guess_r = wavelength / ang_diam.to('rad').value
+
+        star_err = IItools.track_error(sig0=err_sig,
+                                       m0=err_mag,
+                                       m=star_mag,
+                                       t0=err_t1,
+                                       t=I_time)
+
+
+        tel_tracks = [IItools.uv_tracks(lat=star_info["LAT"],
+                                        dec=star_info["DEC"],
+                                        hours=star_info["HOURS"],
+                                        Bn=Bns,
+                                        Be=Bew,
+                                        Bu=Bud) for Bns, Bew, Bud in
+                      zip(star_info["BNSS"], star_info["BEWS"], star_info["BUDS"])]
+
+        airy_disk, airy_func = IImodels.airy_disk2D(shape=(star_info["XLEN"], star_info["YLEN"]),
+                                                    xpos=star_info["XLEN"] / 2,
+                                                    ypos=star_info['YLEN'] / 2,
+                                                    arcsec=ang_diam,
+                                                    wavelength=wavelength)
+
+        fitdiams, fiterrs, failed_fits = IItools.IIbootstrap_analysis(tel_tracks=tel_tracks,
+                                                                      airy_func=airy_func,
+                                                                      star_err=star_err,
+                                                                      guess_r=guess_r.to('m').value,
+                                                                      wavelength=wavelength,
+                                                                      runs=boot_runs)
+
+        fdiam_mean = np.mean(fitdiams)
+        ferr_mean = np.mean(fiterrs)
+        ferr_std = np.std(fiterrs)
+        print("Completed %s" % (str.strip(star_name, '* ')))
+        # reg_analysis = np.array([tel_tracks, airy_func, star_err])
+        boot_analysis = np.array([fdiam_mean, ferr_mean, ferr_std, failed_fits])
+
+        danal[i] = boot_analysis
+        # ranal[i] = reg_analysis
+
 def deep_star_analysis(star, star_id, boot_runs = 100, I_time = 1800*u.s):
     ang_diam = star["ANGD"] * u.mas
     star_name = star["SIMID"]
@@ -28,6 +80,8 @@ def deep_star_analysis(star, star_id, boot_runs = 100, I_time = 1800*u.s):
 
     tel_tracks, airy_disk, airy_func = star_airy_track(tel_array=veritas_array, ang_diam=ang_diam,
                                                        wavelength=wavelength, star_id=star_id)
+
+
 
     fitdiams, fiterrs, failed_fits = IItools.IIbootstrap_analysis(tel_tracks=tel_tracks,
                                                                   airy_func=airy_func,
@@ -83,75 +137,90 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
     cat_names = []
     total_obs_times = []
     dup_count = []
-    coords_done = SkyCoord([(0*u.deg,0*u.deg)])
-    i = 0
+    coords_done = None
     for catalog, cat_name in zip(tel_array.catalogs, tel_array.cat_names):
         ras, decs, ang_diams, mags, mag_name = tel_array.ra_dec_diam_getter(cat_name, catalog)
         pos_cat=SkyCoord(ras,decs)
 
-        #match pos_cat to the closest star in coords_done returning the closest coords_done indicies
-        closest_star, skydis, distance3d = pos_cat.match_to_catalog_sky(coords_done)
-
-        #the indicies where the matched pos_cat star is large enough to be considered a unique star
-        clo_idx = skydis > 1 * u.arcsec
-
-        #the indicies of pos_cat which are under 1 arcsec and are considered a duplicate
-        dup_idx = np.where(~clo_idx)
-
-        #the indicies of the full catalog that has the duplicate value
-        dup_star = closest_star[dup_idx]
-
-        coords_done = SkyCoord([c.data for c in coords_done] + [c.data for c in pos_cat[clo_idx]])
 
 
+        if np.alen(pos_cat) ==0:continue
+        if coords_done == None:
+            closest_star, skydis, distance3d = (np.array([]), Angle(np.ones(np.alen(ras)),unit=u.rad), np.full(np.alen(ras),True))
+            coords_done = SkyCoord(good_ra, good_dec, unit=("hourangle", "deg"))
 
-        for ra,dec,ang_diam, mag in zip(ras[clo_idx], decs[clo_idx], ang_diams[clo_idx], mags[clo_idx]):
+        else:
+            coords_done = SkyCoord(good_ra, good_dec, unit=("hourangle","deg"))
+            # match pos_cat to the closest star in coords_done returning the closest coords_done indicies
+
+            closest_star, skydis, distance3d = pos_cat.match_to_catalog_sky(coords_done)
+
+
+
+
+
+
+        # the indicies where the matched pos_cat star is large enough to be considered a unique star
+        unq_idx = skydis > 1 * u.arcsec
+
+        dists = np.full(np.alen(ras),np.inf)
+        rs = np.argsort(ras)
+        dup_diams = []
+        i = 0
+        for ra,dec,ang_diam, mag, unique in zip(ras, decs, ang_diams, mags, unq_idx):
             total_obs_time = 0 * u.hour
 
-            if ra.value not in calc_ra and dec.value not in calc_dec:
+            dis = (ra.to('deg').value + dec.to("deg").value)
+            if np.abs(dists - dis).all() > .1 and unique:
+                dists[i] = dis
                 calc_ra.append(ra.value)
                 calc_dec.append(dec.value)
+                dup_diams.append([ang_diam.to("mas").value, ra, dec,1,cat_name])
                 print("\nAnalyzing Star RA %s DEC %s at %s" % (ra, dec, i))
+
+                star_id = str(ra) + str(dec)
+                tel_array.star_track(ra=ra,
+                                     dec=dec,
+                                     alt_cut=alt_cut)
+
+                if tel_array.star_dict[star_id]["ObsTimes"]:
+                    if np.alen(tel_array.star_dict[star_id]["ObsTimes"]) > 1:
+                        # total_obs_time = np.ptp(tel_array.star_dict[star_id]["ObsTimes"])
+                        total_obs_time = (tel_array.time_delt * np.alen(tel_array.star_dict[star_id]["ObsTimes"])).to('s')
+                    else: total_obs_time=0*u.hour
+
+                if total_obs_time <= cutoff_obs_time * u.hour:
+                    print("Skipping star RA %s DEC %s as it is observable only %s" % (ra, dec, total_obs_time))
+                    continue
+
+                if i== 14:
+                    asdf=123
+                i = i+1
+
+
+                good_diams.append(ang_diam.to("mas").value)
+                good_ra.append(ra.value)
+                good_dec.append(dec.value)
+                good_mag_names.append(mag_name)
+                good_mags.append(mag)
+                cat_names.append(cat_name)
+                total_obs_times.append(total_obs_time.to('s').value)
+                dup_count.append(dup_diams)
+                dup_diams = []
+
+            elif not unique:
+                cat_idx = closest_star[i]
+                # print((np.array(good_ra) - ra.value)[cat_idx])
+                dup_count[cat_idx].append([ang_diam.to("mas").value, good_ra[cat_idx], good_dec[cat_idx],2,cat_name])
+                i = i + 1
             else:
                 print('|', end="")
+                dup_count[-1].append([ang_diam.to("mas").value, ra, dec, 3,cat_name])
                 c=c+1
+                i=i+1
 
-                continue
-            star_id = str(ra) + str(dec)
-            tel_array.star_track(ra=ra,
-                                 dec=dec,
-                                 alt_cut=alt_cut)
-
-            if tel_array.star_dict[star_id]["ObsTimes"]:
-                if np.alen(tel_array.star_dict[star_id]["ObsTimes"]) > 1:
-                    total_obs_time = np.ptp(tel_array.star_dict[star_id]["ObsTimes"])
-                else: total_obs_time=0*u.hour
-
-            if total_obs_time <= cutoff_obs_time * u.hour:
-                print("Skipping star RA %s DEC %s as it is observable only %s" % (ra, dec, total_obs_time))
-                continue
-
-            if i== 14:
-                asdf=123
-            i = i+1
-
-
-            good_diams.append(ang_diam.to("mas").value)
-            good_ra.append(ra.value)
-            good_dec.append(dec.value)
-            good_mag_names.append(mag_name)
-            good_mags.append(mag)
-            cat_names.append(cat_name)
-            total_obs_times.append(total_obs_time.to('s').value)
-            dup_count.append([ang_diam.value])
-
-        if np.alen(dup_star) > 0:
-            try:
-                for mcati, ccati in zip(dup_star, dup_idx[0]):
-                    dup_count[mcati].append(ang_diams[ccati].value)
-            except Exception as e:
-                print(e,c)
-
+    diamstd = np.array([np.std(np.array(np.array(r)[:,0],float)) for r in dup_count])
+    diammean = np.array([np.median(np.array(np.array(r)[:,0],float)) for r in dup_count])
     bs_mat, bs_dis, bs_3dis = SkyCoord(good_ra, good_dec,
                                        unit=(u.hourangle, u.deg)).match_to_catalog_sky(
         SkyCoord(tel_array.BS_stars["RAJ2000"], tel_array.BS_stars["DEJ2000"], unit=(u.hourangle, u.deg)))
@@ -174,15 +243,16 @@ def star_rater(tel_array, xlen, ylen, wavelength, cutoff_obs_time = 0, obs_t=Non
                                    m=bmag,
                                    t0=tel_array.err_t1,
                                    t=obs_t)
-    dtable.pprint(max_lines=-1, max_width=-1)
-    data_table = Table([sim_id.astype("U13"), col(good_ra, unit=u.hourangle), col(good_dec, unit=u.deg), col(good_diams, unit=u.mas),
+    data_table = Table([sim_id.astype("U13"), good_ra, good_dec, good_diams,diammean,diamstd,
                          good_mag_names, good_mags, cat_names, bmag,vmag,
                         bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"], sim_bflux, sim_sptype, simd.to('mas'), sim_rotV,
                         col(amp_errs),col(total_obs_times, unit=u.second), col(obs_t, unit=u.second)],
-                       names=("SIMID","RA","DEC","ANGD",
+                       names=("SIMID","RA","DEC","ANGD","DiamMedian","DiamStd",
                               "FILT","MAG","CAT","BS_BMAG","BS_VMAG",
                               "BSSkyD", "BSSpT", "BSRV","SimBMAG", "SIMSpT", "SIMSkyD", "SIMRV",
                               "ErrAmp", "TotObsTime", "ObsTime"))
+    data_table.pprint(max_lines=-1, max_width=-1)
+
     return data_table
 
 def catalog_builder(veritas_array, wavelength =410e-9 * u.m, cat_name="veritasCatalog"):
@@ -255,6 +325,8 @@ if __name__ == "__main__":
             mag_range = IIparam["magRange"]
             #specifies the lowest altitude your observatory can observe
             alt_cut = IIparam["altitudeCutoff"]
+            #specifies that maximum altitude the sun is allowed to be at to determine when observing can start
+            max_sun_alt = IIparam["maxSunAltitude"]
 
             #this is the name of the output save file
             cat_name = "veritasCatalog%smag%sto%s.dat"%(time, mag_range[0], mag_range[1])
@@ -279,7 +351,7 @@ if __name__ == "__main__":
             else: obs_end = IIparam["observationEnd"]
 
             # steps details how fine you want the baseline graphs to be, fewer steps means faster processing but less detail in the models
-            steps = 600
+            steps = 800
 
 
             #The latitude, longitude, and elevation of the center point of your array
@@ -314,7 +386,8 @@ if __name__ == "__main__":
                                        t1=sigma_time,
                                        mag_range=mag_range,
                                        dec_range=dec_range,
-                                       ra_range=ra_range)
+                                       ra_range=ra_range,
+                                       max_sun_alt=max_sun_alt)
 
     baselines = IItools.array_baselines(veritas_baselines)
     [veritas_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
@@ -337,33 +410,89 @@ if __name__ == "__main__":
     veritas_cat.pprint(max_lines=-1, max_width=-1)
     stop_sel = 'n'
 
-    deep_analysis = []
-    reg_analysis = []
-    for selected_star in veritas_cat:
-        ra = selected_star["RA"] * u.hourangle
-        dec = selected_star["DEC"] * u.deg
-        if 'eps Vir' in selected_star["SIMID"]:
-            asdf=234
-        veritas_array.star_track(ra=ra,
-                                 dec=dec,
-                                 alt_cut=alt_cut,
-                                 obs_start=obs_start,
-                                 obs_end=obs_end,
-                                 Itime=int_time)
-        star_id = str(ra) + str(dec)
+    parallel = False
+    if parallel:
+        processes = []
+        from multiprocessing import Pool
+        import multiprocessing
+        pool = Pool()
 
-        I_time = veritas_array.star_dict[star_id]["IntDelt"]
+        deep_analysis = np.zeros((np.alen(veritas_cat),4))
+        reg_analysis = np.zeros(np.alen(veritas_cat))
+        for i,selected_star in enumerate(veritas_cat):
+            ra = selected_star["RA"] * u.hourangle
+            dec = selected_star["DEC"] * u.deg
+            if 'eps Vir' in selected_star["SIMID"]:
+                asdf = 234
+            veritas_array.star_track(ra=ra,
+                                     dec=dec,
+                                     alt_cut=alt_cut,
+                                     obs_start=obs_start,
+                                     obs_end=obs_end,
+                                     Itime=int_time)
+            star_id = str(ra) + str(dec)
+
+            I_time = veritas_array.star_dict[star_id]["IntDelt"]
+            star_info = {"LAT":veritas_array.telLat.to('rad'),
+                         "DEC":veritas_array.telLat.to('rad'),
+                         "HOURS":Angle(veritas_array.star_dict[star_id]["IntTimes"]).to('rad').value,
+                         "BNSS":veritas_array.Bnss,
+                         "BEWS":veritas_array.Bews,
+                         "BUDS":veritas_array.Buds,
+                         "XLEN":veritas_array.xlen,
+                         "YLEN":veritas_array.ylen}
+            params = [selected_star,
+                      star_info,
+                      wavelength.to('m'),
+                      veritas_array.err_sig,
+                      veritas_array.err_mag,
+                      veritas_array.err_t1,
+                      deep_analysis,
+                      reg_analysis,
+                      i,
+                      boot_runs,
+                      I_time.to('s').value]
+            print(i)
+            processes.append(multiprocessing.Process(target=parallel_star_analysis, args=params))
+        deep_results = np.zeros(np.alen(processes))
+        for i,p in enumerate(processes):
+            print(i)
+            p.start()
+        for p in processes:
+            p.join()
+        asdf=123
 
 
-        if I_time:
-            deep_anal, reg_anal = deep_star_analysis(star=selected_star, star_id=star_id, boot_runs=boot_runs, I_time=I_time.to('s'))
-            deep_analysis.append(deep_anal)
-            reg_analysis.append(reg_anal)
-            abs=2323
-        else:
-            print("For your selected times %s to %s, the star %s cannot be observed"%(obs_start, obs_end, selected_star["SIMID"]))
-            deep_analysis.append([np.nan, np.nan, np.nan, np.nan])
-            reg_analysis.append([np.nan,np.nan,np.nan])
+
+    else:
+        deep_analysis = []
+        reg_analysis = []
+        for selected_star in veritas_cat:
+            name = str.strip(selected_star["SIMID"]," *")
+            ra = selected_star["RA"] * u.hourangle
+            dec = selected_star["DEC"] * u.deg
+            if 'eps Vir' in selected_star["SIMID"]:
+                asdf=234
+            veritas_array.star_track(ra=ra,
+                                     dec=dec,
+                                     alt_cut=alt_cut,
+                                     obs_start=obs_start,
+                                     obs_end=obs_end,
+                                     Itime=int_time)
+            star_id = str(ra) + str(dec)
+
+            I_time = veritas_array.star_dict[star_id]["IntDelt"]
+
+
+            if I_time:
+                deep_anal, reg_anal = deep_star_analysis(star=selected_star, star_id=star_id, boot_runs=boot_runs, I_time=I_time.to('s'))
+                deep_analysis.append(deep_anal)
+                reg_analysis.append(reg_anal)
+                abs=2323
+            else:
+                print("For your selected times %s to %s, the star %s cannot be observed"%(obs_start, obs_end, selected_star["SIMID"]))
+                deep_analysis.append([np.nan, np.nan, np.nan, np.nan])
+                reg_analysis.append([np.nan,np.nan,np.nan])
 
 
     deep_analysis = np.array(deep_analysis)
@@ -387,7 +516,7 @@ if __name__ == "__main__":
 
 
     asdqwer=1239
-
+    IIdisplay.display_airy_disk(veritas_array, veritas_cat[2]["DiamMedian"] * u.mas, wavelength, save_dir)
     response = input("\nEnter an index you wish to make graphs of or enter 'q' to quit\n")
     while(response!='q'):
         try:

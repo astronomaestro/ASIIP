@@ -14,7 +14,7 @@ Vizier.ROW_LIMIT = -1
 
 class IItelescope():
     def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500,
-                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0)):
+                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0), max_sun_alt = -15):
 
         self.Bews = []
         self.Bnss = []
@@ -39,13 +39,17 @@ class IItelescope():
 
         self.time_info = Time(time, location=self.tel_loc)
         self.delta_time = np.linspace(-12, 12, steps) * u.hour
+        self.time_delt = self.delta_time[1]-self.delta_time[0]
+
 
         self.telFrame = AltAz(obstime=self.time_info + self.delta_time, location=self.tel_loc)
 
+
         #get indicies for when sky is dark
         self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
-        dark_times = np.where((self.sunaltazs.alt < -15*u.deg))
+        dark_times = np.where((self.sunaltazs.alt < max_sun_alt * u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
+        self.max_sun_alt = max_sun_alt
 
         #the hour_correction is to shift the sky to include stars that have just barely risen
         hour_correction = 4 * u.hourangle
@@ -290,7 +294,7 @@ class IItelescope():
             mag_name = "Gmag"
             mag = star[mag_name]
 
-        return ra,dec,ang_diam*1.22,mag,mag_name
+        return ra,dec,ang_diam,mag,mag_name
 
     def track_error(self,sig1,m1,m2,t1,t2):
         return sig1*(2.512)**(m2-m1) * (t1/t2)**.5

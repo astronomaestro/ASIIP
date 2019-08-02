@@ -199,9 +199,9 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_r, wavelength, r
     derrs = []
     failed_fits = 0
     for i in range(0, runs):
-        rads, amps, avgrad, avgamp = IImodels.avg_air1D(tel_tracks=tel_tracks,
-                                                          airy_func=airy_func,
-                                                          err=star_err)
+        rads, amps, avgrad, avgamp = IImodels.airy1dTo2d(tel_tracks=tel_tracks,
+                                                         airy_func=airy_func,
+                                                         err=star_err)
 
 
         airy_fitr, airy_fiterr, df,der, sigmas = IImodels.fit_airy_avg(rads=rads,
@@ -221,7 +221,7 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_r, wavelength, r
             failed_fits += 1
             continue
         else:
-            fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('mas')
+            fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('rad')
             fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
             fitdiams.append(fit_diam.value)
             fiterrs.append(fit_err.value)

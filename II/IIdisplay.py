@@ -7,12 +7,26 @@ norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os
 
+def display_airy_disk(veritas_array, angd, wavelength, save_dir):
+    airy_disk, airy_func = IImodels.airy_disk2D(shape=(veritas_array.xlen, veritas_array.ylen),
+                                                xpos=veritas_array.xlen / 2,
+                                                ypos=veritas_array.ylen / 2,
+                                                arcsec=angd,
+                                                wavelength=wavelength)
+    norm = viz.ImageNormalize(1, stretch=viz.LogStretch())
 
+    plt.figure(figsize=(80, 80))
+
+    plt.title("The Airy disk of a %s Point Source"%(angd))
+    plt.xlabel("Meters")
+    plt.ylabel("Meters")
+    plt.imshow(airy_disk, norm=norm, cmap="gray")
+    graph_saver(save_dir, "AiryDisk")
 
 def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, fullAiry=False):
-    rads, amps, avgrad, avgamp = IImodels.avg_air1D(tel_tracks=tel_tracks,
-                                                    airy_func=airy_func,
-                                                    err=star_err)
+    rads, amps, avgrad, avgamp = IImodels.airy1dTo2d(tel_tracks=tel_tracks,
+                                                     airy_func=airy_func,
+                                                     err=star_err)
     yerr = np.random.normal(0, star_err, avgamp.shape)
     rerr = np.random.normal(0, guess_r / 5)
     airy_fitr, airy_fiterr, df, der, sig = IImodels.fit_airy_avg(rads=rads,
@@ -47,8 +61,7 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
                              num=1000)
         full_y = IImodels.airy1D(full_x, guess_r)
         plt.plot(full_x, full_y, '-', label="True Airy Function", linewidth=3)
-        title = "Star %s Integration time of %s\n fit mas is %s +- %s or %.2f percent all" % (
-            star_name, ITime, fit_diam, fit_err, fit_err / fit_diam * 100)
+        title = "Star %s" % (star_name)
 
     else:
         plt.plot(tr_rad[rs], tr_amp[rs], '-', label="True Airy Function", linewidth=3)
@@ -68,21 +81,21 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     y_0 = airy_func.y_0.value
     y, x = np.mgrid[:x_0 * 2, :y_0 * 2]
     airy_disk = airy_func(x, y)
-    plt.figure(figsize=(28, 28))
+    plt.figure(figsize=(60, 60))
     plt.imshow(airy_disk,
                norm=viz.ImageNormalize(1, stretch=viz.LogStretch()),
                extent=[-x_0, x_0, -y_0, y_0],
-               cmap='Accent_r')
+               cmap='gray')
     for i, track in enumerate(tel_tracks):
-        plt.plot(track[0][:, 0], track[0][:, 1], linewidth=4, color='w')
-        plt.text(track[0][:, 0][5], track[0][:, 1][5], "Baseline %s" % (baselines[i]), fontsize=14, color='w')
-        plt.plot(track[1][:, 0], track[1][:, 1], linewidth=4, color='w')
-        plt.text(track[1][:, 0][5], track[1][:, 1][5], "Baseline %s" % (-baselines[i]), fontsize=14, color='w')
+        plt.plot(track[0][:, 0], track[0][:, 1], linewidth=4, color='b')
+        # plt.text(track[0][:, 0][5], track[0][:, 1][5], "Baseline %s" % (baselines[i]), fontsize=14, color='w')
+        plt.plot(track[1][:, 0], track[1][:, 1], linewidth=4, color='b')
+        # plt.text(track[1][:, 0][5], track[1][:, 1][5], "Baseline %s" % (-baselines[i]), fontsize=14, color='w')
     starttime = veritas_tels.time_info.T + veritas_tels.observable_times[0]
     endtime = veritas_tels.time_info.T + veritas_tels.observable_times[-1]
-    title = "UV plane coverage of %s wavelength %s, %s mas Airy Disk" % (
-        star_name, wavelength, guess_r * wavelength.value)
-    plt.title(title, fontsize=28)
+    title = "Coverage of %s at VERITAS \non %s UTC" % (
+        star_name, veritas_tels.time_info.T)
+    plt.title(title, fontsize=20)
     plt.xlabel("U (meters)", fontsize=22)
     plt.ylabel("V (meters)", fontsize=22)
     plt.tick_params(axis='both', which='major', labelsize=20)

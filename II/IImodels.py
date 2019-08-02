@@ -12,28 +12,12 @@ norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
 
 
-def sine_model(x, amplitude=1., frequency=1.):
-    return amplitude * np.sin(2 * np.pi * frequency * x)
-def sine_deriv(x, amplitude=1., frequency=1.):
-    return 2 * np.pi * amplitude * np.cos(2 * np.pi * frequency * x)
-SineModel = custom_model(sine_model, fit_deriv=sine_deriv)
-
-def cust_airy_disk2D(x, y, x_0, y_0, theta, wavelength):
-    rz = jn_zeros(1, 1)[0] / np.pi
-
-    radius = wavelength / theta
-
-    r = np.sqrt((x - x_0) ** 2 + (y - y_0) ** 2) / (radius / rz)
-
-    z = np.ones(r.shape)
-    rt = np.pi * r[r > 0]
-    z[r > 0] = (2.0 * j1(rt) / rt) ** 2
 
 def airy_disk2D(shape, xpos, ypos, arcsec, wavelength):
     from astropy.modeling.functional_models import AiryDisk2D
     from astropy.modeling import fitting
 
-    r = wavelength.to('m').value / arcsec.to('rad').value
+    r = 1.22 * wavelength.to('m').value / arcsec.to('rad').value
 
     y, x = np.mgrid[:shape[0], :shape[1]]
     # Fit the data using astropy.modeling
@@ -42,8 +26,8 @@ def airy_disk2D(shape, xpos, ypos, arcsec, wavelength):
     return airy_init(x,y), airy_init
 
 def airy1D(xr, r):
-    con = 1.2196698912665045
-    # con = 1
+    con = jn_zeros(1,1)[0]/np.pi
+    con = 1
     airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
     return airy_mod
 
@@ -69,7 +53,7 @@ def airy_disk1D_Integration(tel_tracks, airy_func, err):
         xerrs.append(Irad)
     return np.ravel(amps), np.ravel(rads), np.ravel(Ints), np.ravel(Irads), np.ravel(aerrs), np.ravel(xerrs)
 
-def avg_air1D(tel_tracks, airy_func, err):
+def airy1dTo2d(tel_tracks, airy_func, err):
     amps = []
     rads = []
     avg_amps = []

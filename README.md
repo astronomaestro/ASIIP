@@ -27,7 +27,6 @@ There are some package dependencies that you will need in order to get the scrip
     - astroquery
     - numpy
     - matplotlib 
-    - json
 
 All of these should be easily installed using 'pip install (your package)'. If there happens to be any more packages you
 need use pip install should easily be able to help you with those as well.
@@ -51,6 +50,8 @@ IIparameters.json included with this package.
     - telLat: the central latitude of the telescope array
     - telLon: the central longitude of the telescope array
     - telElv: the central elevation of the telescope array
+    - altitudeCutoff: the lowest altitude in degress  observable with the given telescope array
+    - maxSunAltitude: the maximum allowable altitude of the sun for valid observations
     - observationStart: The desired start time of the observation. An input of 0 starts the observation at midnight. An input of null stars the observation as early as possible.
     - observationEnd: The desired end time of the observation. An input of 0 ends the observation at midnight. An input of null ends the observation as late as possible.
     - sigmaTel: The predetermined error of your array.
