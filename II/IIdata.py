@@ -68,12 +68,29 @@ class IItelescope():
 
 
     def add_baseline(self, Bew, Bns, Bud):
+        """
+        This adds calculated baseline to an array for easy access for future calculations
+        :param Bew: The East West part of the baseline
+        :param Bns: The North South part of the baseline
+        :param Bud: The Elevation baseline
+        :return:
+        """
         self.Bews.append(Bew)
         self.Bnss.append(Bns)
         self.Buds.append(Bud)
 
     def star_track(self, ra=None, dec=None, sunangle=-15, alt_cut=20, obs_start=None, obs_end=None, Itime =1800 * u.s):
-
+        """
+        This uses astropy to figure out the times available to measure a star throughout the night.
+        :param ra: The right ascension of the star you wish to measure in J2000
+        :param dec: The declenation of the star you wish to measure in J2000
+        :param sunangle: The altitude the sun must be below. The times when the sun is above this are considered invalid
+        :param alt_cut: The lowest possible altitude a observatory can measure at
+        :param obs_start: when the observation will be starting, in astropy units of hours. 0h is midnight, None is as early as possible
+        :param obs_end: when the observation will be ending, in astropy units of hours. 0h is midnight, None is as late as possible
+        :param Itime: The Integration time of your observations
+        :return: Appends the stars calculated informtion to the star dictionary using it's unique RA and DEC
+        """
         ra_dec = str(ra) + str(dec)
         starToTrack = SkyCoord(ra=ra, dec=dec)
 
@@ -114,26 +131,39 @@ class IItelescope():
 
 
     def make_gaia_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
+        '''
+        Query gaia's data release 2 (DR2) using VizieR
+        :param mag_range: the magnitude range you wish to constrain the query by
+        :param ra_range: the RA range you wish to constrain the query by
+        :param dec_range: The DEC range you wish to constrain the query by
+        :return: appends results to the catalogs results array
+        '''
         columns = ['N', 'RAJ2000','DEJ2000','Gmag','BPmag','RPmag','Teff','Rad','Lum','Plx']
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         print("Retrieving Catalogue")
         Vizier.query_constraints_async()
         result = v.query_constraints(catalog="I/345/gaia2",
-                                     Gmag='>%s & <%s' %(mag_range[0], mag_range[1]),
+                                     BPmag='>%s & <%s' %(mag_range[0], mag_range[1]),
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         asdf=123
-
-        good_vals = np.where(~np.isnan(result[0]['Rad']))
-
-        self.gaia = result[0][good_vals]
-        self.catalogs.append(self.gaia)
-        self.cat_names.append("GAIA")
+        if result:
+            good_vals = np.where(~np.isnan(result[0]['Rad']))
+            self.gaia = result[0][good_vals]
+            self.catalogs.append(self.gaia)
+            self.cat_names.append("GAIA")
 
 
     def make_cadars_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
+        """
+        Query the CADARS catalog using VizieR
+        :param mag_range: the magnitude range you wish to constrain the query by
+        :param ra_range: the RA range you wish to constrain the query by
+        :param dec_range: The DEC range you wish to constrain the query by
+        :return: appends results to the catalogs results array
+        """
         columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag']
         v = Vizier()
         v.ROW_LIMIT = -1
@@ -143,14 +173,21 @@ class IItelescope():
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
-
-        good_val = np.where(~np.isnan(result[0]['Diam']))
-        self.cadars = result[0][good_val]
-        self.catalogs.append(self.cadars)
-        self.cat_names.append("CEDARS")
+        if result:
+            good_val = np.where(~np.isnan(result[0]['Diam']))
+            self.cadars = result[0][good_val]
+            self.catalogs.append(self.cadars)
+            self.cat_names.append("CEDARS")
 
 
     def make_charm2_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
+        """
+        Query the CHARM2 catalog using VizieR
+        :param mag_range: the magnitude range you wish to constrain the query by
+        :param ra_range: the RA range you wish to constrain the query by
+        :param dec_range: The DEC range you wish to constrain the query by
+        :return: appends results to the catalogs results array
+        """
         columns = ['N', 'Type','Id1', 'Method', 'Lambda', 'UD', 'e_UD', 'LD', 'e_LD', 'RAJ2000', 'DEJ2000', 'Vmag', 'Kmag', 'Bmag']
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
@@ -162,12 +199,20 @@ class IItelescope():
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
-        good_val = np.where(~np.isnan(result[0]['UD']))
-        self.charm2 = result[0][good_val]
-        self.catalogs.append(self.charm2)
-        self.cat_names.append("CHARM2")
+        if result:
+            good_val = np.where(~np.isnan(result[0]['UD']))
+            self.charm2 = result[0][good_val]
+            self.catalogs.append(self.charm2)
+            self.cat_names.append("CHARM2")
 
     def make_jmmc_query(self, mag_range=(1, 6), ra_range=(30, 100), dec_range=(30, 100)):
+        """
+        Query the JMMC catalog using VizieR
+        :param mag_range: the magnitude range you wish to constrain the query by
+        :param ra_range: the RA range you wish to constrain the query by
+        :param dec_range: The DEC range you wish to constrain the query by
+        :return: appends results to the catalogs results array
+        """
         columns = ['RAJ2000','DEJ2000','2MASS','Tessmag','Teff','R*','M*','logg','Dis','Gmag','Vmag','Bmag']
         v = Vizier()
         v.ROW_LIMIT = -1
@@ -179,14 +224,21 @@ class IItelescope():
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
-        good_val = np.where(~np.isnan(result[0]['Dis']))
-        self.jmmc = result[0][good_val]
-        self.catalogs.append(self.jmmc)
-        self.cat_names.append("JMMC")
+        if result:
+            good_val = np.where(~np.isnan(result[0]['Dis']))
+            self.jmmc = result[0][good_val]
+            self.catalogs.append(self.jmmc)
+            self.cat_names.append("JMMC")
 
 
 
     def bright_star_cat(self, ra_range=(30, 100), dec_range=(30, 100)):
+        """
+        Query the Bright Star catalog using VizieR
+        :param ra_range: the RA range you wish to constrain the query by
+        :param dec_range: The DEC range you wish to constrain the query by
+        :return: appends results to the object
+        """
         from astroquery.vizier import Vizier
         columns = ['Name','RAJ2000','DEJ2000','Vmag','B-V','U-B', "SpType", "RotVel", "Multiple"]
         v = Vizier(columns=columns)
@@ -195,20 +247,20 @@ class IItelescope():
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
-        bs_cat = result[0]
-        good_ind = np.where((bs_cat["RAJ2000"] != "") | (bs_cat["DEJ2000"] != ""))
-        # RAJ2000 = Angle(bs_cat["RAJ2000"][good_ind], u.hourangle)
-        # DEJ2000 = Angle(bs_cat["DEJ2000"][good_ind], u.deg)
-        # viewable_stars = np.where((RAJ2000 > ra_range[0] * u.hourangle) & (RAJ2000 < ra_range[1] * u.hourangle) &
-        #                           (DEJ2000 > dec_range[0] * u.deg) & (DEJ2000 < dec_range[1] * u.deg))
-        self.BS_stars = bs_cat[good_ind]
-        #(bs_cat[good_ind]["B-V"] + bs_cat[good_ind]["Vmag"])[np.where((bs_cat[good_ind]["B-V"] + bs_cat[good_ind]["Vmag"])<3)]
-        # self.catalogs.append(self.BS_stars)
-        # self.cat_names.append("BS")
-        #
-        # adf=12312
+        if result:
+            bs_cat = result[0]
+            good_ind = np.where((bs_cat["RAJ2000"] != "") | (bs_cat["DEJ2000"] != ""))
+            self.BS_stars = bs_cat[good_ind]
+
 
     def make_tess_query(self, mag_range=(1, 6), ra_range=(0, 360), dec_range=(-90, 90)):
+        """
+        Query the TESS input catalog using VizieR
+        :param mag_range: the magnitude range you wish to constrain the query by
+        :param ra_range: the RA range you wish to constrain the query by
+        :param dec_range: The DEC range you wish to constrain the query by
+        :return: appends results to the catalogs results array
+        """
         print("Retrieving Catalogue")
 
         columns = ['RAJ2000','DEJ2000','TIC','2MASS','Tessmag','Teff','R*','M*','logg','Dist','Gmag','Vmag']
@@ -220,22 +272,21 @@ class IItelescope():
                                      RAJ2000=">%s & <%s"%(ra_range[0], ra_range[1]),
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
-        good_val = np.where(~np.isnan(result[0]['R_']) & ~np.isnan(result[0]['Dist']))
+        if result:
+            good_val = np.where(~np.isnan(result[0]['R_']) & ~np.isnan(result[0]['Dist']))
 
-        self.tess = result[0][good_val]
-        self.catalogs.append(self.tess)
-        self.cat_names.append("TESS")
+            self.tess = result[0][good_val]
+            self.catalogs.append(self.tess)
+            self.cat_names.append("TESS")
 
-    def make_simbad_query(self, mag_range=(1, 6), ra_range=(0, 360), dec_range=(-90, 90)):
-        from astroquery.simbad import Simbad
-        Simbad.add_votable_fields('flux(B)', 'flux(G)')
-        Simbad.query_criteria(catalog="J/AJ/156/102",
-                                     Tessmag='Bmag >%s & Bmag <%s & '
-                                             'RA >%s & RA <%s & '
-                                             'DEC >%s & DEC <%s' %
-                                             (mag_range[0], mag_range[1],ra_range[0], ra_range[1],dec_range[0], dec_range[1]))
 
     def simbad_matcher(self, ras, decs):
+        """
+        Match master SII catalog results to stars within SIMBAD.
+        :param ras: The list of Right Ascensions you wish to query simbad with
+        :param decs: The list of Declenations you wish to query simbad with
+        :return: The closest matches that SIMBAD has found for your input RA and DEC
+        """
         from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(B)', 'flux(G)', 'flux(V)', 'sptype', 'rot', "v*", "velocity", "distance",
                                   "diameter",
@@ -247,38 +298,37 @@ class IItelescope():
         simm, simd, sim3d = sim_coords.match_to_catalog_sky(simqcoord)
         return sim[good_b][simm], simd
 
-    def download_vizier_cat(self, cat, name):
-        from astroquery.vizier import Vizier
-        Vizier.ROW_LIMIT = -1
-        catalog = Vizier.find_catalogs(cat)
-        cata = Vizier.get_catalogs(catalog.keys())
-        ascii.write(cata, "%s.dat"%(name))
 
-    # def simbad_matcher(self,ras,decs):
-    #     from astroquery.simbad import Simbad
-    #     coords = SkyCoord(ras,decs,unit=(u.deg, u.deg))
-    #     Simbad.get_field_description()
-
-    def ra_dec_diam_getter(self, tel, star):
-        if tel.upper() == "CEDARS":
+    def ra_dec_diam_getter(self, cat_name, star):
+        """
+        This is used to retrieve the right ascension, declenation, angular diameter, magnitude, and magnitude type.
+        A function like this was used to improve readability of the code as each catalog contains keys which are unique
+        to the catalog itself, the units were often not the same for differing catalogs, with some catalogs including
+        angular diameter, while some only included information you could use to calculate an angular diameter.
+        :param cat_name: The name of the catalog you wish to retrieve the information from
+        :param star: The catalog entry containing all of the information from the query
+        :return: The RA in J2000 hourangle, The DEC in J2000 degrees, the angular diameter in arcseconds, the magnitude,
+        the name of the filter used to retrive the magnitude
+        """
+        if cat_name.upper() == "CEDARS":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             ang_diam = star["Diam"].to('arcsec')
             mag_name = "Vmag"
             mag = star[mag_name]
-        elif tel.upper() == "JMMC":
+        elif cat_name.upper() == "JMMC":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             ang_diam = star["UDDB"].to('arcsec')
             mag_name = "Bmag"
             mag = star[mag_name]
-        elif tel.upper() == "CHARM2":
+        elif cat_name.upper() == "CHARM2":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             ang_diam = star["UD"].to('arcsec')
             mag_name = "Bmag"
             mag = star[mag_name]
-        elif tel.upper() == "TESS":
+        elif cat_name.upper() == "TESS":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             dist= star['Dist']
@@ -286,15 +336,13 @@ class IItelescope():
             ang_diam = (((diam.to('m')/dist.to('m')))*u.rad).to('arcsec')
             mag_name = "Vmag"
             mag = star[mag_name]
-        elif tel.upper() == "GAIA":
+        elif cat_name.upper() == "GAIA":
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             dist = 1/(star['Plx']/1000)*u.parsec
             ang_diam = (((2*star["Rad"].to('m')/dist.to('m')))*u.rad).to('arcsec')
-            mag_name = "Gmag"
+            mag_name = "BPmag"
             mag = star[mag_name]
 
         return ra,dec,ang_diam,mag,mag_name
 
-    def track_error(self,sig1,m1,m2,t1,t2):
-        return sig1*(2.512)**(m2-m1) * (t1/t2)**.5

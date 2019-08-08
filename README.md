@@ -75,8 +75,9 @@ columns is given below
     -SIMID: The ID given by SIMBAD to star located at the associated RA and DEC
     -RA: The stars J2000 Right Acension 
     -DEC: The stars J2000 Declination
-    -ANGD: The stars angular diameter in milli arc seconds (mas)
-    -FILT: The filter that was used when querying the catalog
+    -ANGD: The first angular diameter in milli arc seconds (mas) from the corresponding catalog CAT. This was done to enable comparison to the median angular diameter.
+    -DiamMedian: The median diameter calculated from each duplicate entry across all of the catalogs. Caution should be taken when this is highly different from ANGD.
+    -DiamStd: The standard deviation of the duplicate angular diameter measurement across all of the catalogs. Caution should be taken when this value is high.    -FILT: The filter that was used when querying the catalog
     -MAG: The magnitude associated with the FILT entry
     -CAT: The catalog the entry comes from
     -BS_BMAG: The Bright Star catalog B magnitude
@@ -95,7 +96,7 @@ columns is given below
     -ObsTime: The integration time used in the analysis
     -MeanDiamFit: The mean analytical fit of the empirical models
     -PerDiamErr: the percentage error of the mean diameter fit to the true value
-    -PerErrDiamFitErr: The percentage deviation of the fit from trial to trial. If this is higher then .2 then caution 
+    -PerFitErr: The percentage deviation of the fit from trial to trial. If this is higher then 20 then caution 
     should be taken when fitting this data as the fit may simply be converging to a value close to the guess value
     -PerFailFit: The percentage of how many analytical fits failed. If this is high, then it's very likely a poor target
     to observe

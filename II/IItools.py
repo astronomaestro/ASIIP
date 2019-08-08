@@ -12,6 +12,13 @@ from astroquery.vizier import Vizier
 
 
 def radial_profile(data, center=None):
+    """
+    Calculate a circular 1D radial profile given a 2D array
+    :param data: The 2D image you wish to take a radial profile of
+    :param center: the location of the center of the image. If None, it will assume the center of the image is in the
+    center of the array
+    :return: The 1D radial profile of your data
+    """
     if center == None:
         center = (data.shape[0] / 2, data.shape[1] / 2)
 
@@ -25,7 +32,13 @@ def radial_profile(data, center=None):
     return radialprofile
 
 def proj_baseline(lat, dec, hour):
-
+    """
+    The function used to calculate coverage of a projected baseline on the uv-plane
+    :param lat: The latitude of the observatory in radians
+    :param dec: The declenation of your target in radians
+    :param hour: The hourangle of your target in radians
+    :return: The calculated projected baseline
+    """
     ar = np.array
     Bp1 = ar([ar([-np.sin(lat) * np.sin(hour), np.cos(hour), np.cos(lat) * np.sin(hour)]),
 
@@ -40,6 +53,16 @@ def proj_baseline(lat, dec, hour):
 
 
 def uv_tracks(lat, dec, hours, Bn, Be, Bu):
+    """
+    Calculate the uv-plane coverage for all possible baselines for a given observatory
+    :param lat: The latitude of your observatory
+    :param dec: The declenation of your target in radians
+    :param hours: The hourangle of your target in radians
+    :param Bn: The North South baselines of the observatory in meters
+    :param Be: The East West baselines of the observatory in meters
+    :param Bu: The Elevation baselines of the observatory in meters
+    :return: The calculated tracks along with the reflected tracks as it's Visibility squared
+    """
 
     baselines = np.transpose(np.array([Bn, Be, Bu]))
     track = np.array([np.dot(proj_baseline(lat,dec,hour), baselines) for hour in hours])
@@ -48,6 +71,11 @@ def uv_tracks(lat, dec, hours, Bn, Be, Bu):
     return track, ref_track
 
 def array_baselines(tel_locs):
+    """
+    Use the telescope locations relative to each other to calculate all possible baselines with the given array.
+    :param tel_locs: The x,y,z coordinates of your telescopes relative to a central position, in meters.
+    :return: the calculated baselines for the given telescope positions
+    """
     n = np.alen(tel_locs)
     N = n*(n-1)/2
     baselines = []
@@ -58,59 +86,14 @@ def array_baselines(tel_locs):
     return baselines
 
 
-def airy_disk2D(shape, xpos, ypos, r):
-    from astropy.modeling.functional_models import AiryDisk2D
-    from astropy.modeling import models, fitting
-
-    y, x = np.mgrid[:shape[0], :shape[1]]
-    # Fit the data using astropy.modeling
-    p_init = AiryDisk2D(x_0=xpos, y_0=ypos, radius=r)
-    fit_p = fitting.LevMarLSQFitter()
-    return p_init(x,y), p_init
-
-
-def gaussian_disk2D():
-    from astropy.modeling import models
-    import warnings
-    import numpy as np
-    import matplotlib.pyplot as plt
-    from astropy.modeling import models, fitting
-
-    np.random.seed(0)
-    x = np.linspace(-5., 5., 200)
-    y = 3 * np.exp(-0.5 * (x - 1.3) ** 2 / 0.8 ** 2)
-    y += np.random.normal(0., 0.2, x.shape)
-
-    # Generate fake data
-    np.random.seed(0)
-    y, x = np.mgrid[:128, :128]
-    z = 3 * np.exp(-.0001 * (y-50)**2 * (x - 50) ** 2 / 0.8 ** 2)
-    z += np.random.normal(0., 0.1, z.shape) * 3
-
-    # Fit the data using astropy.modeling
-    p_init = models.Gaussian2D(amplitude=1, x_mean=1, y_mean=1)
-    fit_p = fitting.LevMarLSQFitter()
-
-    with warnings.catch_warnings():
-        # Ignore model linearity warning from the fitter
-        warnings.simplefilter('ignore')
-        p = fit_p(p_init, x, y, z)
-
-    # Plot the data with the best-fit model
-    plt.figure(figsize=(8, 2.5))
-    plt.subplot(1, 3, 1)
-    plt.imshow(z, origin='lower', interpolation='nearest')
-    plt.title("Data")
-    plt.subplot(1, 3, 2)
-    plt.imshow(p(x, y), origin='lower', interpolation='nearest')
-    plt.title("Model")
-    plt.subplot(1, 3, 3)
-    plt.imshow(z - p(x, y), origin='lower', interpolation='nearest')
-    plt.title("Residual")
-
-
 
 def track_coverage(tel_tracks, airy_func):
+    """
+    Calculate the amount of coverage for given orders of an airy disk, as well as the amplitude range.
+    :param tel_tracks: The uv-track coverage calculated for a target at an observatory
+    :param airy_func: the Airy Function of your target
+    :return:
+    """
     x_0 = airy_func.x_0.value
     y_0 = airy_func.y_0.value
     ranges = []
@@ -143,6 +126,16 @@ def track_coverage(tel_tracks, airy_func):
     return r0_cov/r_0, r1_cov/r_0, r2_cov/r_0, r0_amp, r1_amp, r_amp
 
 def curve_amplitude(ranges, st, end, airy_func, x_0, y_0):
+    """
+    Find the amplitude range of your uv-plane coverage for your targets Airy Disk
+    :param ranges: The ranges of the baseline coverage you have in meters
+    :param st: Used to define the location of the start of the order you want to analyze
+    :param end: Used to define the location of the end of the order you want to analyze
+    :param airy_func: The airy function of the target you wish to analyze
+    :param x_0: The x coordinate of the center of your airy disk
+    :param y_0: The y coordinate of the center of your airy disk
+    :return: The ampliude range of the baseline coverage for the order that was specified by st and end
+    """
     r0_range = [getIntersection(rang, [st, end]) for rang in ranges if getIntersection(rang, [st, end]) is not 0]
     minr = np.min(r0_range)
     maxr = np.max(r0_range)
@@ -150,10 +143,27 @@ def curve_amplitude(ranges, st, end, airy_func, x_0, y_0):
     low = airy_func(y_0, maxr + x_0)
     return high - low
 
-def track_error(sig0, m0, m, t0, t):
-    return sig0 * (2.512) ** (m - m0) * (t0 / t) ** .5
+def track_error(sig0, m0, m, T_0, T):
+    """
+    A function that allows dynamic error calculation, given an initial error measurment
+    :param sig0: The empiracally calculated error for a given array of telescopes
+    :param m0: The magnitude used in calculating sig0
+    :param m: The magniutde of the target being analyzing
+    :param T_0: The integration time used in calculating sig0
+    :param T: The integration time used when observing a target
+    :return:
+    """
+    return sig0 * (2.512) ** (m - m0) * (T_0 / T) ** .5
 
 def trap_w_err(numerical_f, r, erra, errb):
+    """
+    Integrate using the trapeoidal rule and include the uncertainty in such a calculation
+    :param numerical_f: A numerical function that is going to be integrated
+    :param r: The x values of your function
+    :param erra: The error associated with your numerical function
+    :param errb: The error associated with your numercial function
+    :return:
+    """
     fa = numerical_f[:-1]
     fb = numerical_f[1:]
     ra = r[:-1]
@@ -164,7 +174,13 @@ def trap_w_err(numerical_f, r, erra, errb):
     Ierr = dr*np.sqrt(erra**2 + errb*2)*C
     return I, Ierr, dr
 
+
 def trapezoidal_average(num_f):
+    """
+    Using integration, take the average of a numerical function using the trapezoidal rule
+    :param num_f:
+    :return:
+    """
     if np.alen(num_f)>1:
         fa = num_f[:-1]
         fb = num_f[1:]
@@ -175,6 +191,11 @@ def trapezoidal_average(num_f):
 
 
 def interval_merger(intervals):
+    """
+    Using a given set of intervals, merge overlapping intervals
+    :param intervals:
+    :return:
+    """
     sint = sorted(intervals, key=lambda i: i[0])
     out = [sint[0]]
     for current in sorted(intervals, key=lambda i: i[0]):
@@ -186,53 +207,69 @@ def interval_merger(intervals):
     return out
 
 def getIntersection(interval_1, interval_2):
+    """
+    Determine where two given intervals overlap
+    :param interval_1: The starting interval
+    :param interval_2: The ending interval
+    :return:
+    """
     st = np.max([interval_1[0], interval_2[0]])
     end = np.min([interval_1[1], interval_2[1]])
     if st < end:
         return [st, end]
     return 0
 
-def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_r, wavelength, runs):
-    fitdiams = []
+def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_diam, wavelength, runs):
+    """
+    This is a custom bootstrap like analysis which creates model data using the given input parameters, adds gaussian error
+    to the simulated data, adds gaussian error to guess_r, and then attempts to fit the simulated data with error added
+    using the guess_r with the error added to see if the fit will converge to the original guess_r. If the fit cannot
+    coverge to the original guess_r over many different fits, the given target is likely not useful to observe.
+    :param tel_tracks: The uv-coverage tracks for a given target
+    :param airy_func: The Airy Function of for a given target
+    :param star_err: The error associated with measuring a given target with a given observatory
+    :param guess_diam: The initial guess diameter of your target in meters
+    :param wavelength: The wavlength of the used filter in meters
+    :param runs: The amount of simulations to perform
+    :return: The fitted angular diameters of your target in radians
+    """
+    fit_diams = []
     fiterrs = []
-    dfs = []
-    derrs = []
     failed_fits = 0
     for i in range(0, runs):
-        rads, amps, avgrad, avgamp = IImodels.airy1dTo2d(tel_tracks=tel_tracks,
-                                                         airy_func=airy_func,
-                                                         err=star_err)
+        rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
+                                                         airy_func=airy_func)
 
 
-        airy_fitr, airy_fiterr, df,der, sigmas = IImodels.fit_airy_avg(rads=rads,
-                                     amps=amps,
-                                     avg_rads=avgrad,
-                                     avg_amps=avgamp + np.random.normal(0,star_err, avgamp.shape),
-                                     func=airy_func,
-                                     err=star_err,
-                                     guess_r=guess_r+ np.random.normal(0,guess_r/5),
-                                     real_r=guess_r)
-        # airy_fitr, airy_fiterr = IImodels.fit_airy1D(rx=tr_Irad[rsort],
-        #                                              airy_amp=tr_Ints[rsort] + tr_aerrs[rsort],
-        #                                              guess_r=guess_r + np.random.normal(0,guess_r/5),
-        #                                              errs=np.full(np.alen(tr_Ints), star_err))
+        try:
+            airy_fitr, airy_fiterr, sigmas = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad,
+                                                                   avg_amps=avgamp + np.random.normal(0, star_err,avgamp.shape),
+                                                                   err=star_err,
+                                                                   guess_r=guess_diam + np.random.normal(0,guess_diam / 5))
 
-        if np.abs(airy_fitr[0]) > guess_r * 15 or airy_fiterr > guess_r * 15:
-            failed_fits += 1
-            continue
-        else:
-            fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('rad')
-            fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
-            fitdiams.append(fit_diam.value)
-            fiterrs.append(fit_err.value)
-            dfs.append(((wavelength.to('m').value / df[0] * u.rad).to('mas')).value)
+            if np.abs(airy_fitr[0]) > guess_diam*10:
+                fit_diams.append(np.nan)
+                fiterrs.append(np.nan)
+                failed_fits += 1
+                continue
 
-    try:
-        smartfiterr = np.mean(fitdiams)/((wavelength.to('m').value / guess_r * u.rad).to('mas')).value
-        airyfiterr = np.mean(dfs)/((wavelength.to('m').value / guess_r * u.rad).to('mas')).value
-        print("smartfiterr %s, airyfit %s"%(smartfiterr, airyfiterr))
-    except:
-        print('everything failed')
-    return np.array(fitdiams), np.array(fiterrs), failed_fits
+            fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0]
+            fit_diams.append(airy_fitr[0])
+            fiterrs.append(fit_err)
+
+        except Exception as e:
+            print(e)
+            print("The fit failed")
+            failed_fits +=1
+            fit_diams.append(np.nan)
+            fiterrs.append(np.nan)
+
+    npdiams = np.array(fit_diams)
+    nperrs = np.array(fiterrs)
+    neg = np.where(npdiams < 0)
+    npdiams[neg] = np.nan
+    nperrs[neg] = np.nan
+
+    return npdiams, nperrs, failed_fits
 
 

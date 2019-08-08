@@ -11,7 +11,7 @@ def display_airy_disk(veritas_array, angd, wavelength, save_dir):
     airy_disk, airy_func = IImodels.airy_disk2D(shape=(veritas_array.xlen, veritas_array.ylen),
                                                 xpos=veritas_array.xlen / 2,
                                                 ypos=veritas_array.ylen / 2,
-                                                arcsec=angd,
+                                                angdiam=angd,
                                                 wavelength=wavelength)
     norm = viz.ImageNormalize(1, stretch=viz.LogStretch())
 
@@ -24,20 +24,13 @@ def display_airy_disk(veritas_array, angd, wavelength, save_dir):
     graph_saver(save_dir, "AiryDisk")
 
 def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, fullAiry=False):
-    rads, amps, avgrad, avgamp = IImodels.airy1dTo2d(tel_tracks=tel_tracks,
-                                                     airy_func=airy_func,
-                                                     err=star_err)
+    rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
+                                                     airy_func=airy_func)
     yerr = np.random.normal(0, star_err, avgamp.shape)
     rerr = np.random.normal(0, guess_r / 5)
-    airy_fitr, airy_fiterr, df, der, sig = IImodels.fit_airy_avg(rads=rads,
-                                                                 amps=amps,
-                                                                 avg_rads=avgrad,
-                                                                 avg_amps=avgamp + yerr,
-                                                                 func=airy_func,
-                                                                 err=star_err,
-                                                                 guess_r=guess_r + rerr,
-                                                                 real_r=guess_r)
-    fit_diam = (wavelength.to('m').value / airy_fitr[0] * u.rad).to('mas')
+    airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,
+                                                        err=star_err, guess_r=guess_r + rerr)
+    fit_diam = (wavelength / airy_fitr[0] * u.rad).to('mas')
     fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0] * fit_diam
     tr_Irad = avgrad.ravel()
     tr_Ints = avgamp.ravel()
