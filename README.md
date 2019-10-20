@@ -1,4 +1,4 @@
-# Intensity Interferometry Target Planner
+# A Stellar Intensity Interferometry Target Planner (ASIIP)
 * What this target planner does
 
 -A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for VERITAS but can work with any Intensity Interferometry system. 
