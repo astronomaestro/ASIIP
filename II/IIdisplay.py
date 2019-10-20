@@ -23,6 +23,29 @@ def display_airy_disk(veritas_array, angd, wavelength, save_dir):
     plt.imshow(airy_disk, norm=norm, cmap="gray")
     graph_saver(save_dir, "AiryDisk")
 
+
+
+def chi_square_anal(tel_tracks, airy_func, star_err, guess_r, ang_diam, star_name, save_dir):
+    angdiams, chis = IItools.chi_square_anal(airy_func=airy_func,
+                                             tel_tracks=tel_tracks,
+                                             guess_r=guess_r,
+                                             star_err=star_err,
+                                             ang_diam=ang_diam)
+
+
+    plt.figure(figsize=(16,16))
+    title = "%s Chi square analysis" % (star_name)
+    plt.title(title, fontsize=28)
+    plt.xlabel("Fit value (mas)", fontsize=22)
+    plt.ylabel("ChiSquare", fontsize=22)
+    plt.ylim((0,5))
+    plt.tick_params(axis='both', which='major', labelsize=20)
+    plt.tick_params(axis='both', which='minor', labelsize=18)
+
+    plt.plot(angdiams, chis, linewidth=6)
+
+    graph_saver(save_dir, title)
+
 def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, fullAiry=False):
     rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
                                                      airy_func=airy_func)
@@ -37,7 +60,7 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     tr_rad = rads.ravel()
     tr_amp = amps.ravel()
     rs = np.argsort(tr_rad)
-    plt.figure(figsize=(32, 20))
+    plt.figure(figsize=(28, 20))
     plt.errorbar(x=tr_Irad,
                  y=tr_Ints + yerr.ravel(),
                  fmt='o',
@@ -74,7 +97,7 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     y_0 = airy_func.y_0.value
     y, x = np.mgrid[:x_0 * 2, :y_0 * 2]
     airy_disk = airy_func(x, y)
-    plt.figure(figsize=(60, 60))
+    plt.figure(figsize=(20, 20))
     plt.imshow(airy_disk,
                norm=viz.ImageNormalize(1, stretch=viz.LogStretch()),
                extent=[-x_0, x_0, -y_0, y_0],
@@ -95,7 +118,7 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     plt.tick_params(axis='both', which='minor', labelsize=18)
 
     plt.colorbar()
-    graph_saver(save_dir, title)
+    graph_saver(save_dir, "CoverageOf%sOn%sUTC" % (star_name, veritas_tels.time_info.T))
 
 def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
     noise_array = 0

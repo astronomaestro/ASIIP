@@ -14,7 +14,7 @@ Vizier.ROW_LIMIT = -1
 
 class IItelescope():
     def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500,
-                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0), max_sun_alt = -15):
+                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0), max_sun_alt = -15, timestep=.5):
 
         self.Bews = []
         self.Bnss = []
@@ -34,14 +34,12 @@ class IItelescope():
         self.err_mag = m1
         self.err_t1 = t1
 
-        self.star_degs = None
         self.time_info = None
 
         self.time_info = Time(time, location=self.tel_loc)
         self.delta_time = np.linspace(-12, 12, steps) * u.hour
+
         self.time_delt = self.delta_time[1]-self.delta_time[0]
-
-
         self.telFrame = AltAz(obstime=self.time_info + self.delta_time, location=self.tel_loc)
 
 
@@ -50,6 +48,15 @@ class IItelescope():
         dark_times = np.where((self.sunaltazs.alt < max_sun_alt * u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
         self.max_sun_alt = max_sun_alt
+
+
+        self.int_delta_time = np.append(np.arange(-12,12,timestep),12)*u.hour
+        self.intTelFrame = AltAz(obstime=self.time_info + self.int_delta_time, location=self.tel_loc)
+        self.intsunaltazs = get_sun(self.int_delta_time+self.time_info).transform_to(self.intTelFrame)
+
+        int_dark_times = np.where((self.intsunaltazs.alt < max_sun_alt * u.deg))
+        self.int_dark_times = self.intTelFrame.obstime.sidereal_time('apparent')[int_dark_times]
+
 
         #the hour_correction is to shift the sky to include stars that have just barely risen
         hour_correction = 4 * u.hourangle
@@ -96,13 +103,14 @@ class IItelescope():
 
 
         starLoc = starToTrack.transform_to(self.telFrame)
-
-
         sky_ind = np.where((self.sunaltazs.alt < sunangle*u.deg) & (starLoc.alt > alt_cut * u.deg))[0]
         observable_times = self.delta_time[sky_ind]
+
         if np.alen(observable_times)==0:
             if ra_dec not in self.star_dict:self.star_dict[ra_dec] = {}
             self.star_dict[ra_dec]["ObsTimes"] = np.nan
+            self.star_dict[ra_dec]["totTime"] = 0*u.s
+
             return 0
         mintime = np.min(observable_times)
         maxtime = np.max(observable_times)
@@ -115,17 +123,27 @@ class IItelescope():
             self.star_dict[ra_dec]["DEC"] = dec
             self.star_dict[ra_dec]["ObsTimes"] = observable_times
             self.star_dict[ra_dec]["SideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind] - starToTrack.ra
+            self.star_dict[ra_dec]["Alt"] = starLoc.alt[sky_ind]
+            self.star_dict[ra_dec]["Airmass"] = starLoc.secz[sky_ind]
             self.observable_times = observable_times
+            self.star_dict[ra_dec]["totTime"] = (self.time_delt * np.alen(observable_times)).to('s')
 
 
-        time_overlap = IItools.getIntersection([obs_start.to('h').value, obs_end.to('h').value],
-                                               [mintime.to('h').value,maxtime.to('h').value])
-        if time_overlap:
-            self.star_dict[ra_dec]["IntTimes"] = np.arange(time_overlap[0], time_overlap[1], Itime.to('h').value)*u.hour
-            self.star_dict[ra_dec]["IntDelt"] = Itime.to('h')
-        else:
-            self.star_dict[ra_dec]["IntTimes"] = None
-            self.star_dict[ra_dec]["IntDelt"] = None
+        # time_overlap = IItools.getIntersection([obs_start.to('h').value, obs_end.to('h').value],
+        #                                        [mintime.to('h').value,maxtime.to('h').value])
+            int_starLoc = starToTrack.transform_to(self.intTelFrame)
+            int_sky_ind = np.where((self.intsunaltazs.alt <= sunangle * u.deg) & (int_starLoc.alt >= alt_cut * u.deg))[0]
+            int_observable_times = self.int_delta_time[int_sky_ind]
+            time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start-Itime) & (self.int_delta_time[int_sky_ind] <= obs_end+Itime))
+
+            if np.alen(time_range[0]) > 1:
+                self.star_dict[ra_dec]["IntTimes"] = self.int_delta_time[int_sky_ind][time_range]
+                self.star_dict[ra_dec]["IntDelt"] = Itime.to('h')
+                self.star_dict[ra_dec]["IntSideTimes"] = self.intTelFrame.obstime.sidereal_time('apparent')[int_sky_ind][time_range] - starToTrack.ra
+
+            else:
+                self.star_dict[ra_dec]["IntTimes"] = None
+                self.star_dict[ra_dec]["IntDelt"] = None
 
 
 
@@ -297,6 +315,31 @@ class IItelescope():
         simqcoord = SkyCoord(sim["RA"][good_b], sim["DEC"][good_b], unit=(u.hourangle, u.deg))
         simm, simd, sim3d = sim_coords.match_to_catalog_sky(simqcoord)
         return sim[good_b][simm], simd
+
+    def cephied_finder(self, ras, decs, radius = 2*u.arcsec):
+        """
+        Match master SII catalog results to stars in GCVS.
+        :param ras: The list of Right Ascensions you wish to query simbad with
+        :param decs: The list of Declenations you wish to query simbad with
+        :return: The closest matches that SIMBAD has found for your input RA and DEC
+        """
+        print("Retrieving Catalogue")
+
+        columns = ['RAJ2000','DEJ2000','GCVS','VarType','magMax',"Period",'SpType','VarName']
+        v = Vizier(columns=columns)
+        v.ROW_LIMIT = -1
+        gcvs_coords = SkyCoord(ras, decs, unit=(u.hourangle, u.deg))
+
+        result = v.query_region(catalog="B/gcvs/gcvs_cat",
+                                     coordinates=gcvs_coords,
+                                     radius=radius)
+
+        gcvscoord = SkyCoord(result[0]["RAJ2000"], result[0]["DEJ2000"], unit=(u.hourangle, u.deg))
+        gcvsm, gcvsd, gcvs3d = gcvscoord.match_to_catalog_sky(gcvs_coords)
+
+        return result[0], gcvsm, gcvsd
+
+
 
 
     def ra_dec_diam_getter(self, cat_name, star):

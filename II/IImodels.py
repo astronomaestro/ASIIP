@@ -63,7 +63,10 @@ def airy2dTo1d(tel_tracks, airy_func):
     x_0 = airy_func.x_0.value
     y_0 = airy_func.y_0.value
     for i, track in enumerate(tel_tracks):
-        utrack = track[0][:, 0] + x_0
+        try:
+            utrack = track[0][:, 0] + x_0
+        except:
+            adsf=34
         vtrack = track[0][:, 1] + y_0
         amps.append(airy_func(utrack, vtrack))
         rads.append(np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2))

@@ -123,7 +123,7 @@ def track_coverage(tel_tracks, airy_func):
         r1_amp = curve_amplitude(merged_ranges,r_0,r_0*2,airy_func,x_0,y_0)
     r_amp = np.ptp(amps)
 
-    return r0_cov/r_0, r1_cov/r_0, r2_cov/r_0, r0_amp, r1_amp, r_amp
+    return
 
 def curve_amplitude(ranges, st, end, airy_func, x_0, y_0):
     """
@@ -247,7 +247,7 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_diam, wavelength
                                                                    err=star_err,
                                                                    guess_r=guess_diam + np.random.normal(0,guess_diam / 5))
 
-            if np.abs(airy_fitr[0]) > guess_diam*10:
+            if airy_fitr[0] > guess_diam*10 or airy_fitr[0] < guess_diam*.1:
                 fit_diams.append(np.nan)
                 fiterrs.append(np.nan)
                 failed_fits += 1
@@ -271,5 +271,42 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_diam, wavelength
     nperrs[neg] = np.nan
 
     return npdiams, nperrs, failed_fits
+
+def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
+    from scipy.stats import chisquare
+    rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
+                                                     airy_func=airy_func)
+    yerr = np.random.normal(0, star_err, avgamp.shape)
+    rerr = np.random.normal(0, guess_r / 5)
+    airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,
+                                                        err=star_err, guess_r=guess_r + rerr)
+
+    mincon = .8
+    maxcon = 1.2
+    min_bound = guess_r * mincon
+    max_bound = guess_r * maxcon
+
+    fit_vals = np.linspace(min_bound, max_bound)
+
+    xvals = np.linspace(0, guess_r * 2)
+    chis = []
+
+    def airy_avg(xr, r):
+        mod_Int = np.array([trapezoidal_average(IImodels.airy1D(rad, r)) for rad in rads])
+        return mod_Int.ravel()
+
+    # plt.plot(avgrad.ravel(), airy_avg(rads, guess_r), 'o')
+
+    perfect_dat = airy_avg(rads, guess_r)
+
+    perfect_dat = airy_avg(rads, guess_r)
+    for val in fit_vals:
+        new_chi = chisquare(airy_avg(rads, val), perfect_dat)
+        chis.append(new_chi[0])
+
+    plot_vals = np.linspace(ang_diam * mincon, ang_diam * maxcon)
+
+    # plt.plot(plot_vals, chis)
+    return plot_vals,chis
 
 

@@ -315,7 +315,8 @@ if __name__ == "__main__":
                                    mag_range=mag_range,
                                    dec_range=dec_range,
                                    ra_range=ra_range,
-                                   max_sun_alt=max_sun_alt)
+                                   max_sun_alt=max_sun_alt,
+                                   timestep=int_time.value)
 
     baselines = IItools.array_baselines(relative_tel_locs)
     [tel_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
@@ -346,12 +347,21 @@ if __name__ == "__main__":
     star_funcs = []
     star_errs = []
     s = timer.time()
+
+    sim_inlcuded = "SimBMAG" in master_SII_cat.columns
+
+
+
+
     for star in master_SII_cat:
         if star["NAME"]: name = str.strip(star["NAME"], " *")
         else: name = "NONAME"
         ra = star["RA"] * u.hourangle
         dec = star["DEC"] * u.deg
-        star_mag = star["MAG"]
+
+        if sim_inlcuded: star_mag = star["SimBMAG"]
+        else: star_mag = star["MAG"]
+
         ang_diam = (star["ANGD"] * u.mas).to('rad').value
         guess_diam = wavelength / ang_diam
         star_id = str(ra) + str(dec)
@@ -365,16 +375,27 @@ if __name__ == "__main__":
 
         I_time = tel_array.star_dict[star_id]["IntDelt"]
 
+        # if "gam Cas" in name:
+        #     adsf = 123
+        #
+        #     tel_array.star_track(ra=ra,
+        #                          dec=dec,
+        #                          alt_cut=alt_cut,
+        #                          obs_start=obs_start,
+        #                          obs_end=obs_end,
+        #                          Itime=int_time)
 
 
         if I_time:
+
+
             star_err = IItools.track_error(sig0=tel_array.err_sig,
                                            m0=tel_array.err_mag,
                                            m=star_mag,
                                            T_0=tel_array.err_t1,
                                            T=I_time.to("s").value)
 
-            hour_angle_rad = Angle(tel_array.star_dict[star_id]["IntTimes"]).to('rad').value
+            hour_angle_rad = Angle(tel_array.star_dict[star_id]["IntSideTimes"]).to('rad').value
             dec_angle_rad = tel_array.star_dict[star_id]["DEC"].to('rad').value
             lat = tel_array.telLat.to('rad').value
 
@@ -413,10 +434,14 @@ if __name__ == "__main__":
             abs=2323
         else:
             print("For your selected times %s to %s, the star %s cannot be observed" % (obs_start, obs_end, star["NAME"]))
-            fit_diams.append(np.nan)
-            fit_errs.append(np.nan)
-            failed_fits.append(np.nan)
+            fit_diams.append(np.full(boot_runs, np.nan))
+            fit_errs.append(np.full(boot_runs, np.nan))
+            failed_fits.append(boot_runs)
             guess_diams.append(guess_diam)
+
+            star_tracks.append(np.nan)
+            star_funcs.append(np.nan)
+            star_errs.append(np.nan)
 
 
     e = timer.time()
@@ -430,6 +455,7 @@ if __name__ == "__main__":
     medianerr = np.nanmedian(fit_errs, axis=1)
     true_err = (1-medianFits/guess_diams)*100
     stdFits = np.nanstd(fit_diams, axis=1)
+    # stdFits = np.nansum((fit_diams-guess_diams[:,None])**2,axis=1)/np.count_nonzero(~np.isnan(fit_diams), axis=1)
     diam_percent_err = medianerr
     err_of_diam_err = stdFits/medianFits*100
 
@@ -441,43 +467,80 @@ if __name__ == "__main__":
 
     lowerr = np.argsort(master_SII_cat, order=["PerFailFit", "PerFitErr"])
     rasort = np.argsort(master_SII_cat, order=["RA"])
+
+    from astroquery.simbad import Simbad
+
+    # asdqwer=1239
+
+    # max_radius = 5*u.arcsec
+
+    # cep_res, cep_mat, cep_dis = tel_array.cephied_finder(ras=master_SII_cat["RA"],
+    #                                              decs=master_SII_cat["DEC"],
+    #                                                     radius=max_radius)
+    #
+    # #
+    # # varInfo = np.full(np.alen(lowerr), "---------")
+    # # varInfo[cep_mat] = cep_res["VarType"]
+    # # gcvsNames = np.full(np.alen(lowerr),"---------")
+    # # gcvsNames[cep_mat] = cep_res["GCVS"]
+    # # matchDis = np.full(np.alen(lowerr), "---------")
+    # # matchDis[cep_mat] = cep_dis.to("mas")
+    # # # gcvsSpTy = np.full(np.alen(lowerr), "---------")
+    # # # gcvsSpTy[cep_mat] = cep_res["SpType"]
+    # #
+    # # master_SII_cat.add_column(col(varInfo), name="VariableInfo")
+    # # master_SII_cat.add_column(col(matchDis, name="VariableDis"))
+    # # master_SII_cat.add_column(col(gcvsNames, name="GCVSName"))
+    # # master_SII_cat.add_column(col(gcvsSpTy, name="GCVSSpType"))
+    #
+    # master_SII_cat[cep_mat]["VariableDis"] = cep_dis.to("mas")
+    #
+    # stable_targs = np.where((master_SII_cat[lowerr]["PerFitErr"] < 20) & (master_SII_cat[lowerr]["MAG"] < 4))
+
     master_SII_cat[lowerr].pprint(max_lines=-1, max_width=-1)
 
+    # stable_targs = np.where((master_SII_cat[lowerr]["PerFitErr"] < 20) & (master_SII_cat[lowerr]["MAG"] < 4))
+    # print(np.alen(master_SII_cat[lowerr][stable_targs]))
 
-
-
-    asdqwer=1239
-    # IIdisplay.display_airy_disk(veritas_array, veritas_cat[2]["DiamMedian"] * u.mas, wavelength, save_dir)
     response = input("\nEnter an index you wish to make graphs of or enter 'q' to quit\n")
     while(response!='q'):
         try:
             n = int(response)
-            guess_r = (wavelength / (master_SII_cat[n]["ANGD"] * u.mas).to('rad').value)
+            ang_diam = (master_SII_cat[n]["ANGD"] * u.mas).to('rad')
+            guess_r = (wavelength / ang_diam)
             star_track = star_tracks[n]
             star_func = star_funcs[n]
             star_err = star_errs[n]
             name = master_SII_cat[n]["NAME"]
+            ra = master_SII_cat[n]["RA"]
+            dec = master_SII_cat[n]["DEC"]
+            star_id = str(ra*u.hourangle) + str(dec*u.deg)
+
             if not name: name = "RA:%s DEC:%s" % (master_SII_cat[n]["RA"], master_SII_cat[n]["DEC"])
             else: name = str.strip(name," *")
             star_save = os.path.join(save_dir, name)
+
+
+
+
+            IIdisplay.chi_square_anal(tel_tracks=star_track,
+                                      airy_func=star_func,
+                                      star_err=star_err,
+                                      guess_r = guess_r.value,
+                                      ang_diam = ang_diam.to('mas').value,
+                                      star_name=name,
+                                      save_dir=star_save)
+
             IIdisplay.uvtrack_model_run(tel_tracks=star_track,
                                         airy_func=star_func,
                                         star_err=star_err,
-                                        guess_r=guess_r,
-                                        wavelength= wavelength,
-                                        star_name=name,
-                                        ITime=I_time,
-                                        save_dir=star_save,
-                                        fullAiry=False)
-            IIdisplay.uvtrack_model_run(tel_tracks=star_track,
-                                        airy_func=star_func,
-                                        star_err=star_err,
-                                        guess_r=guess_r,
-                                        wavelength= wavelength,
+                                        guess_r=guess_r.value,
+                                        wavelength=wavelength,
                                         star_name=name,
                                         ITime=I_time,
                                         save_dir=star_save,
                                         fullAiry=True)
+
             IIdisplay.uvtracks_airydisk2D(tel_tracks=star_track,
                                           veritas_tels=tel_array,
                                           baselines=baselines,
@@ -488,7 +551,7 @@ if __name__ == "__main__":
                                           star_name=name)
         except Exception as e:
             print(e)
-            print("Make sure to enter a valid response\n")
+            print("A bad index was entered or a star that cannot be observed was chosen, try again.\n")
         response = input("enter an index you wish to make graphs of or enter 'q' to quit\n")
 
 
@@ -501,7 +564,6 @@ if __name__ == "__main__":
 #         n = star["Index"]
 #         trac = star_tracks[n]
 #         func = star_funcs[n]
-#         r0_cov, r1_cov, r2_cov, r0_amp, r1_amp, r_amp = IItools.track_coverage(trac, func)
 #         xvals.append(star[xn])
 #         yvals.append(star[yn])
 #         ramps.append(r_amp)
@@ -510,8 +572,6 @@ if __name__ == "__main__":
 # plt.xlabel("Star Rank")
 # plt.plot(np.array(ramps)/np.array(yvals),'o')
 
-
-#
 # xvals=[]
 # yvals=[]
 # midx=[]
@@ -520,28 +580,29 @@ if __name__ == "__main__":
 # bady=[]
 # ramps=[]
 # xn= "ANGD"
-# yn="MAG"
+# yn="BS_BMAG"
+# lowsky = np.where(master_SII_cat[lowerr]["BSSkyD"]<3000)
 # for star in master_SII_cat[lowerr]:
 #     if star["PerFitErr"]:
 #         n = star["Index"]
 #         trac = star_tracks[n]
 #         func = star_funcs[n]
-#         r0_cov, r1_cov, r2_cov, r0_amp, r1_amp, r_amp = IItools.track_coverage(trac, func)
-#         if star["PerFitErr"]>60:
+#         if star["PerFitErr"]>30:
 #             badx.append(star[xn])
 #             bady.append(star[yn])
-#         elif star["PerFitErr"]>20 and star["PerFitErr"]<60:
+#         elif star["PerFitErr"]>20 and star["PerFitErr"]<30:
 #             midx.append(star[xn])
 #             midy.append(star[yn])
-#         else:
+#         elif star["PerFitErr"]<20:
 #             xvals.append(star[xn])
 #             yvals.append(star[yn])
 # # plt.xlabel(xn)
-# plt.ylabel(yn)
-# plt.xlabel(xn)
-# plt.semilogx(xvals,yvals,'o',label="FitSTD < 20%",color="b")
-# plt.semilogx(midx,midy,'o',label="FitSTD > 20% & < 60% ",color="y")
-# plt.semilogx(badx,bady,'o',label="FitSTD > 60%",color="r")
+# plt.title("B-Magnitude Vs Angular Diameter Monte-Carlo Results")
+# plt.ylabel("Bright Star Catalogue B magnitude")
+# plt.xlabel("%s(mas)"%(xn))
+# plt.semilogx(xvals,yvals,'o',label="PerFitErr < 20%",color="b",marker='o')
+# plt.semilogx(midx,midy,'o',label="PerFitErr > 20% & < 30% ",color="y",marker="^")
+# plt.semilogx(badx,bady,'o',label="PerFitErr > 30%",color="r",marker="x")
 # plt.legend()
 
 
