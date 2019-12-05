@@ -16,5 +16,6 @@
   "sigmaTel": 0.11,
   "sigmaMag": 1.7,
   "sigmaTime": 800,
-  "bootStrapRuns": 100
+  "bootStrapRuns": 100,
+  "savePlots": true
 }

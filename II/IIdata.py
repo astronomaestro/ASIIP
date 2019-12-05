@@ -8,8 +8,11 @@ import os
 from astroquery.vizier import Vizier
 from II import IItools
 from astropy.coordinates import get_sun
-Vizier.ROW_LIMIT = -1
 
+from astropy.utils import iers
+
+Vizier.ROW_LIMIT = -1
+iers.conf.auto_download = True
 
 
 class IItelescope():

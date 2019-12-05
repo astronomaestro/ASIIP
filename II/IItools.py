@@ -219,12 +219,15 @@ def getIntersection(interval_1, interval_2):
         return [st, end]
     return 0
 
-def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_diam, wavelength, runs):
+def IIbootstrap_analysis_airyDisk(tel_tracks, airy_func, star_err, guess_diam, wavelength, runs):
     """
-    This is a custom bootstrap like analysis which creates model data using the given input parameters, adds gaussian error
+    This is a custom Monte Carlo analysis which creates model data using the given input parameters, adds gaussian error
     to the simulated data, adds gaussian error to guess_r, and then attempts to fit the simulated data with error added
     using the guess_r with the error added to see if the fit will converge to the original guess_r. If the fit cannot
     coverge to the original guess_r over many different fits, the given target is likely not useful to observe.
+
+    If you wish to add different analytical models, you can use this function as a template. The only part which would
+    have to be changed is the fitting of an airy disk.
     :param tel_tracks: The uv-coverage tracks for a given target
     :param airy_func: The Airy Function of for a given target
     :param star_err: The error associated with measuring a given target with a given observatory
@@ -237,35 +240,47 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_diam, wavelength
     fiterrs = []
     failed_fits = 0
     for i in range(0, runs):
-        rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
-                                                         airy_func=airy_func)
+        #this function creates data structers which are an averaged integration of your visibility function transformed
+        #radially into a 1D function. As long as your visibility_function has the appropiate data members, it should
+        #function with any visibility model.
+        rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
+                                                               x_0=airy_func.x_0.value, y_0=airy_func.y_0.value)
 
 
         try:
+            #If you wish to add different analytical models, simply write a function that replaces fit_airy_avg below
+            #Be sure to understand the data structures produced by airy2dTo1d and to include the new model in a different
+            #function to allow for readability
             airy_fitr, airy_fiterr, sigmas = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad,
                                                                    avg_amps=avgamp + np.random.normal(0, star_err,avgamp.shape),
                                                                    err=star_err,
                                                                    guess_r=guess_diam + np.random.normal(0,guess_diam / 5))
 
+            #if the fit error is extremly high, count it as a failed fit
             if airy_fitr[0] > guess_diam*10 or airy_fitr[0] < guess_diam*.1:
                 fit_diams.append(np.nan)
                 fiterrs.append(np.nan)
                 failed_fits += 1
                 continue
 
+            #calulate the error necessary and append to the necessary arrays
             fit_err = np.sqrt(np.diag(airy_fiterr))[0] / airy_fitr[0]
             fit_diams.append(airy_fitr[0])
             fiterrs.append(fit_err)
 
         except Exception as e:
+            #use a try, except block for when the fit fails and add a failed fit when this happens
             print(e)
             print("The fit failed")
             failed_fits +=1
             fit_diams.append(np.nan)
             fiterrs.append(np.nan)
 
+    #create numpy arrays for easy appending to the Astropy table in a later date
     npdiams = np.array(fit_diams)
     nperrs = np.array(fiterrs)
+
+    #if a negative value for the diameter was determined, it's obviously wrong and replace the value with nan
     neg = np.where(npdiams < 0)
     npdiams[neg] = np.nan
     nperrs[neg] = np.nan
@@ -274,8 +289,8 @@ def IIbootstrap_analysis(tel_tracks, airy_func, star_err, guess_diam, wavelength
 
 def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
     from scipy.stats import chisquare
-    rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
-                                                     airy_func=airy_func)
+    rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
+                                                           x_0=airy_func.x_0.value, y_0=airy_func.y_0.value)
     yerr = np.random.normal(0, star_err, avgamp.shape)
     rerr = np.random.normal(0, guess_r / 5)
     airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,

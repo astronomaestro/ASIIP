@@ -236,9 +236,10 @@ def catalog_builder(tel_array, cat_name="MasterSIICatalog"):
 
 if __name__ == "__main__":
     print("Welcome to the VERITAS catalog builder. Please make sure you are running the catalog for the desire night.\n")
+
     try:
         if np.alen(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "IIparameters.json"
+        else: param_file_name = "ExampleSIIparameters.json"
 
         #Read in parameters from the parameter file
         with open(param_file_name) as param:
@@ -293,6 +294,8 @@ if __name__ == "__main__":
             sigma_tel = IIparam["sigmaTel"]
             sigma_mag = IIparam["sigmaMag"]
             sigma_time = IIparam["sigmaTime"]
+
+            save_plots = IIparam["savePlots"]
 
 
 
@@ -386,6 +389,7 @@ if __name__ == "__main__":
         #                          Itime=int_time)
 
 
+        # if there are any valid points, begin the Monte Carlo Analysis
         if I_time:
 
 
@@ -413,13 +417,16 @@ if __name__ == "__main__":
                                                         angdiam=ang_diam,
                                                         wavelength=wavelength)
 
+
+            #This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
+            #can use this function as a template to create another analysis technique
             fdiams, ferrs, ffit = \
-                IItools.IIbootstrap_analysis(tel_tracks=tel_tracks,
-                                             airy_func=airy_func,
-                                             star_err=star_err,
-                                             guess_diam=guess_diam,
-                                             wavelength=wavelength,
-                                             runs=boot_runs)
+                IItools.IIbootstrap_analysis_airyDisk(tel_tracks=tel_tracks,
+                                                      airy_func=airy_func,
+                                                      star_err=star_err,
+                                                      guess_diam=guess_diam,
+                                                      wavelength=wavelength,
+                                                      runs=boot_runs)
             guess_diam = wavelength / ang_diam
 
             fit_diams.append(wavelength/fdiams * u.rad.to('mas'))
@@ -433,6 +440,9 @@ if __name__ == "__main__":
             print("Completed %s" % (name))
             abs=2323
         else:
+
+            #becasue of indexing and performance concerncs with Astropy Tables, the array are constructed and then
+            #appended to the final table
             print("For your selected times %s to %s, the star %s cannot be observed" % (obs_start, obs_end, star["NAME"]))
             fit_diams.append(np.full(boot_runs, np.nan))
             fit_errs.append(np.full(boot_runs, np.nan))
@@ -497,6 +507,8 @@ if __name__ == "__main__":
     #
     # stable_targs = np.where((master_SII_cat[lowerr]["PerFitErr"] < 20) & (master_SII_cat[lowerr]["MAG"] < 4))
 
+    master_SII_cat["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT", "PerFitErr", "PerFailFit"][lowerr].pprint(max_lines=-1,
+                                                                                                 max_width=-1)
     master_SII_cat[lowerr].pprint(max_lines=-1, max_width=-1)
 
     # stable_targs = np.where((master_SII_cat[lowerr]["PerFitErr"] < 20) & (master_SII_cat[lowerr]["MAG"] < 4))
@@ -521,7 +533,8 @@ if __name__ == "__main__":
             star_save = os.path.join(save_dir, name)
 
 
-
+            if not save_plots:
+                star_save = False
 
             IIdisplay.chi_square_anal(tel_tracks=star_track,
                                       airy_func=star_func,

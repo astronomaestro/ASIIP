@@ -21,7 +21,11 @@ def display_airy_disk(veritas_array, angd, wavelength, save_dir):
     plt.xlabel("Meters")
     plt.ylabel("Meters")
     plt.imshow(airy_disk, norm=norm, cmap="gray")
-    graph_saver(save_dir, "AiryDisk")
+
+    if save_dir:
+        graph_saver(save_dir, "AiryDisk")
+    else:
+        plt.show()
 
 
 
@@ -44,11 +48,14 @@ def chi_square_anal(tel_tracks, airy_func, star_err, guess_r, ang_diam, star_nam
 
     plt.plot(angdiams, chis, linewidth=6)
 
-    graph_saver(save_dir, title)
+    if save_dir:
+        graph_saver(save_dir, title)
+    else:
+        plt.show()
 
 def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, fullAiry=False):
-    rads, amps, avgrad, avgamp = IImodels.airy2dTo1d(tel_tracks=tel_tracks,
-                                                     airy_func=airy_func)
+    rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
+                                                           x_0=airy_func.x_0.value, y_0=airy_func.y_0.value)
     yerr = np.random.normal(0, star_err, avgamp.shape)
     rerr = np.random.normal(0, guess_r / 5)
     airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,
@@ -90,7 +97,10 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     plt.tick_params(axis='both', which='major', labelsize=20)
     plt.tick_params(axis='both', which='minor', labelsize=18)
 
-    graph_saver(save_dir, title+"1D")
+    if save_dir:
+        graph_saver(save_dir, title+"1D")
+    else:
+        plt.show()
 
 def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r, wavelength, save_dir, star_name):
     x_0 = airy_func.x_0.value
@@ -118,7 +128,11 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     plt.tick_params(axis='both', which='minor', labelsize=18)
 
     plt.colorbar()
-    graph_saver(save_dir, "CoverageOf%sOn%sUTC" % (star_name, veritas_tels.time_info.T))
+
+    if save_dir:
+        graph_saver(save_dir, "CoverageOf%sOn%sUTC" % (star_name, veritas_tels.time_info.T))
+    else:
+        plt.show()
 
 def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
     noise_array = 0

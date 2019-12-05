@@ -48,11 +48,13 @@ def airy1D(xr, r):
     airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
     return airy_mod
 
-def airy2dTo1d(tel_tracks, airy_func):
+def visibility2dTo1d(tel_tracks, visibility_func, x_0, y_0):
     """
     Take the tracks generated from a 2D airy disk curve and convert them into a 1D airy disk curve
+    :param x_0: The x coordinate 0 point of the visibility model
+    :param y_0: The y coordinate 0 point of the visibility model
     :param tel_tracks: The tracks from the 2D airy disk
-    :param airy_func: The function used to generate the tracks
+    :param visibility_func: The 2D visibility function used to generate the tracks
     :return: The radial x values, The amplitude at those radii, average integrated radial x values, the average
     integrated amplitude at those raddi
     """
@@ -60,15 +62,14 @@ def airy2dTo1d(tel_tracks, airy_func):
     rads = []
     avg_amps = []
     avg_rads = []
-    x_0 = airy_func.x_0.value
-    y_0 = airy_func.y_0.value
+
     for i, track in enumerate(tel_tracks):
         try:
             utrack = track[0][:, 0] + x_0
         except:
             adsf=34
         vtrack = track[0][:, 1] + y_0
-        amps.append(airy_func(utrack, vtrack))
+        amps.append(visibility_func(utrack, vtrack))
         rads.append(np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2))
         airy_avg = IItools.trapezoidal_average(num_f=amps[i])
         avg_rad = IItools.trapezoidal_average(num_f=rads[i])
@@ -92,6 +93,9 @@ def fit_airy_avg(rads, avg_rads, avg_amps, err, guess_r):
     :return: The fitted parameters, the error of that fit, the constructed error array
     """
 
+    #This slightly hacky piece of code allows for the construction of a piecewise integration function. It's one of the
+    #more complex parts, but is extremely important if accurate fits are to be made, especially with more complicated
+    #visibility models.
     def airy_avg(xr,r):
         mod_Int = np.array([IItools.trapezoidal_average(airy1D(rad, r)) for rad in rads])
         return mod_Int.ravel()
