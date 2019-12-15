@@ -282,18 +282,13 @@ def catalog_builder(tel_array, cat_name="MasterSIICatalog"):
                               ra_range=ra_range,
                               dec_range=dec_range)
 
-
-
-    tel_array.make_cadars_query(mag_range=mag_range,
-                                ra_range=ra_range,
-                                dec_range=dec_range)
-
-
-
     tel_array.make_charm2_query(mag_range=mag_range,
                                 ra_range=ra_range,
                                 dec_range=dec_range)
 
+    tel_array.make_cadars_query(mag_range=mag_range,
+                                ra_range=ra_range,
+                                dec_range=dec_range)
 
     tel_array.bright_star_cat(ra_range=ra_range,
                               dec_range=dec_range)
