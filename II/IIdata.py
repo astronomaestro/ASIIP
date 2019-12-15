@@ -120,12 +120,17 @@ class IItelescope():
         if not obs_start: obs_start = mintime
         if not obs_end: obs_end = maxtime
 
+        ftime_range = np.where((observable_times >= obs_start-Itime) & (observable_times <= obs_end+Itime))
+
+
+
         if ra_dec not in self.star_dict:
             self.star_dict[ra_dec] = {}
             self.star_dict[ra_dec]["RA"] = ra
             self.star_dict[ra_dec]["DEC"] = dec
             self.star_dict[ra_dec]["ObsTimes"] = observable_times
-            self.star_dict[ra_dec]["SideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind] - starToTrack.ra
+            # self.star_dict[ra_dec]["SideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][ftime_range] - starToTrack.ra
+
             self.star_dict[ra_dec]["Alt"] = starLoc.alt[sky_ind]
             self.star_dict[ra_dec]["Airmass"] = starLoc.secz[sky_ind]
             self.observable_times = observable_times
@@ -139,11 +144,22 @@ class IItelescope():
             int_observable_times = self.int_delta_time[int_sky_ind]
             time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start-Itime) & (self.int_delta_time[int_sky_ind] <= obs_end+Itime))
 
+            if np.alen(ftime_range[0]) > 2:
+                self.star_dict[ra_dec]["fIntTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
+                                                          ftime_range] - starToTrack.ra
+                self.star_dict[ra_dec]["fIntDelt"] = self.star_dict[ra_dec]["fIntTimes"][1] - \
+                                                     self.star_dict[ra_dec]["fIntTimes"][0]
+                self.star_dict[ra_dec]["fIntSideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
+                                                              ftime_range] - starToTrack.ra
+            else:
+
+                self.star_dict[ra_dec]["fIntTimes"] = None
+                self.star_dict[ra_dec]["fIntDelt"] = None
+
             if np.alen(time_range[0]) > 1:
                 self.star_dict[ra_dec]["IntTimes"] = self.int_delta_time[int_sky_ind][time_range]
                 self.star_dict[ra_dec]["IntDelt"] = Itime.to('h')
                 self.star_dict[ra_dec]["IntSideTimes"] = self.intTelFrame.obstime.sidereal_time('apparent')[int_sky_ind][time_range] - starToTrack.ra
-
             else:
                 self.star_dict[ra_dec]["IntTimes"] = None
                 self.star_dict[ra_dec]["IntDelt"] = None

@@ -287,6 +287,9 @@ def IIbootstrap_analysis_airyDisk(tel_tracks, airy_func, star_err, guess_diam, w
 
     return npdiams, nperrs, failed_fits
 
+def chisq(obs, exp, error):
+    return np.sum((obs - exp) ** 2 / (error ** 2))
+
 def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
     from scipy.stats import chisquare
     rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
@@ -296,12 +299,12 @@ def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
     airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,
                                                         err=star_err, guess_r=guess_r + rerr)
 
-    mincon = .8
-    maxcon = 1.2
-    min_bound = guess_r * mincon
-    max_bound = guess_r * maxcon
+    mincon = .5
+    maxcon = 1.5
+    min_bound = .1
+    max_bound = 3
 
-    fit_vals = np.linspace(min_bound, max_bound)
+    fit_vals = np.linspace(min_bound*guess_r, max_bound*guess_r, num=300)
 
     xvals = np.linspace(0, guess_r * 2)
     chis = []
@@ -316,12 +319,12 @@ def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
 
     perfect_dat = airy_avg(rads, guess_r)
     for val in fit_vals:
-        new_chi = chisquare(airy_avg(rads, val), perfect_dat)
-        chis.append(new_chi[0])
+        new_chi = chisq(airy_avg(rads, val), perfect_dat, star_err)
+        chis.append(new_chi)
 
-    plot_vals = np.linspace(ang_diam * mincon, ang_diam * maxcon)
+    plot_vals = np.linspace(ang_diam * mincon, ang_diam * maxcon, num=300)
 
     # plt.plot(plot_vals, chis)
-    return plot_vals,chis
+    return plot_vals[::-1],chis
 
 

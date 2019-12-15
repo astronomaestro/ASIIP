@@ -43,8 +43,8 @@ def airy1D(xr, r):
     :param r: the radius of the first zero of the airy disk
     :return:
     """
-    # con = jn_zeros(1,1)[0]/np.pi
-    con = 1
+    con = jn_zeros(1,1)[0]/np.pi
+    # con = 1
     airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
     return airy_mod
 

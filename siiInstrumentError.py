@@ -1,19 +1,24 @@
+#if you want to calculate an error for your telescope instrument, you can use this script to assist you in doing so
+#it returns the value you need for the parameter 'sigmaTel'
+
 import numpy as np
 
 #The magnitude of the target you are measuring
 m = 1.7
-#Your integration time
+#Your integration time in seconds
 T = 800
-#the electronic bandwidth of your detector
-electronic_bandwidth = 600
-#The area of your telescope in meters
+#the electronic bandwidth of your detector in Hz
+electronic_bandwidth = 100 * 10**6
+#The total area of your telescope in meters
 v_area = 6**2 * np.pi
 #The quantum efficiency associated with the detector
-quant_eff = 1
+quant_eff = .15
+#A calibration constant determined empirically
+C = 1
 
 
 
-def tel_err(area, quant_eff, bandwidth, m, T):
+def tel_err(area, quant_eff, bandwidth, m, T, C):
     """
     This is a simple function to assist with the calcuation of sigmaTel used in ASIIP's input parameter file
     :param area: The area of the telescope
@@ -21,14 +26,16 @@ def tel_err(area, quant_eff, bandwidth, m, T):
     :param bandwidth: The bandwidth of your detector
     :param m: The magnitude of your target
     :param T: The integration time of the target
+    :param N: The number of baselines in your array
+    :param C: The calibration constant
     :return: The calculated error
     """
     #a constant associated with calculation the spectral densiy
     n0 = 5e-5
-    #the spectral density
+    #the spectral density in uniits of m^-2*s^-1*Hz^-1
     spec_dens = n0 * 2.5**(-m)
 
-    calculated_error = 1/(area*quant_eff*spec_dens) * np.sqrt(2/(bandwidth*T))
+    calculated_error = 1/(area*quant_eff*spec_dens) * np.sqrt(2/(bandwidth*T)) * C
 
     print("For the given input parameters\n"
           "Telescope area = %s\n"
@@ -39,6 +46,6 @@ def tel_err(area, quant_eff, bandwidth, m, T):
 
     return calculated_error
 
-tel_err(v_area, quant_eff, electronic_bandwidth, m, T)
+tel_err(v_area, quant_eff, electronic_bandwidth, m, T, C)
 
 

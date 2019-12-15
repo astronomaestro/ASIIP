@@ -42,7 +42,7 @@ def chi_square_anal(tel_tracks, airy_func, star_err, guess_r, ang_diam, star_nam
     plt.title(title, fontsize=28)
     plt.xlabel("Fit value (mas)", fontsize=22)
     plt.ylabel("ChiSquare", fontsize=22)
-    plt.ylim((0,5))
+    plt.ylim((0,10))
     plt.tick_params(axis='both', which='major', labelsize=20)
     plt.tick_params(axis='both', which='minor', labelsize=18)
 

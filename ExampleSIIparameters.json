@@ -6,7 +6,7 @@
   "magRange": [-2,2],
   "wavelength": 410e-9,
   "telLocs": [[135.48, -8.61, 12.23],[44.1, -47.7, 4.4],[29.4, 60.1, 9.8],[-35.9, 11.3, 7.0]],
-  "integrationTime":0.5,
+  "integrationTime":1,
   "telLat": 31.675,
   "telLon": -110.952,
   "telElv": 1268,
@@ -14,9 +14,9 @@
   "maxSunAltitude": -15,
   "observationStart": null,
   "observationEnd": null,
-  "sigmaTel": 0.11,
+  "sigmaTel": 0.05,
   "sigmaMag": 1.7,
   "sigmaTime": 800,
   "bootStrapRuns":50,
-  "savePlots": true
+  "savePlots": false
 }
