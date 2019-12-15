@@ -20,12 +20,17 @@ completed catalog once the user quits.
 
 * Running the Script
 
+Make sure you update your parameter file to match the physical characteristics of your array.
+
+If you need help determining the sigmaTel parameter, the siiInstrumentError.py script can provide a rough estimate.
+Simply change the variable in that script to match your SII instrument and it will give an estimate for the error 
+associated with a given integration time and target.
+
 This Python script was written using Python 3.7, so a Python 2 compiler might not work as expected. To run the target 
 planner, open a terminal (or command prompt) and change your directory to where interferometer.py is located and then 
 type this
 
-    python interferometer.py
-
+    python asiip.py
 
 There are some package dependencies that you will need in order to get the script running.
 
