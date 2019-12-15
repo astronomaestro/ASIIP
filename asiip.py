@@ -381,7 +381,7 @@ if __name__ == "__main__":
             save_plots = IIparam["savePlots"]
 
             #this is the name of the output save file
-            cat_name = "%sCatalog%smag%sto%s_obsstart_%s_obsend_%sRA%sTo%s.siicat"%\
+            cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f.siicat"%\
                        (observatory_name,time, mag_range[0], mag_range[1], obs_start, obs_end, ra_range[0], ra_range[1])
             curdir = os.path.dirname(__file__)
             #this is the directory where all analysis graphs will be saved.
