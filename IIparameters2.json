@@ -1,6 +1,6 @@
 {
   "time": "2019-12-21 07:00:00",
-  "raRange": [0,360],
+  "raRange": [0,24],
   "decRange": [-20,90],
   "magRange": [-4,4],
   "wavelength": 410e-9,

@@ -4,17 +4,17 @@
 import numpy as np
 
 #The magnitude of the target you are measuring
-m = 1.7
+m = 1.9
 #Your integration time in seconds
-T = 800
+T = 1800
 #the electronic bandwidth of your detector in Hz
 electronic_bandwidth = 100 * 10**6
 #The total area of your telescope in meters
 v_area = 6**2 * np.pi
 #The quantum efficiency associated with the detector
-quant_eff = .15
+quant_eff = .1
 #A calibration constant determined empirically
-C = 1
+C = 2.05
 
 
 
@@ -42,7 +42,7 @@ def tel_err(area, quant_eff, bandwidth, m, T, C):
           "Quantum Efficiency = %s\n"
           "Star Magnitude = %s\n"
           "Integration Time = %s\n"
-          "The error for your telescope is %.2f" % (area, quant_eff, m, T, calculated_error))
+          "The error for your telescope is %.3f" % (area, quant_eff, m, T, calculated_error))
 
     return calculated_error
 

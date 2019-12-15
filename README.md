@@ -52,7 +52,7 @@ analyze. Description of the parameters are given below. If you want to see an ex
 IIparameters.json included with this package.
  
     - time(YYYY-MM-DD HH:MM:SS): Specifies the desired date of observation. The target planner expects the midnight time of your array in UTC time
-    - raRange(degrees): Specifies the desired RA range query constraints from 0 to 360.
+    - raRange(hourangle): Specifies the desired RA range query constraints from 0 to 24.
     - decRange(degrees): Specifies the DEC range query constraints from -90 to 90.
     - magRange: Specifies the Magnitude range query constraints
     - wavelength(meters): Specifies the wavelength of the filter being used
