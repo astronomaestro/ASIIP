@@ -336,7 +336,7 @@ if __name__ == "__main__":
             time = IIparam["time"]
             observatory_name = IIparam["obsName"]
 
-            ra_range = Angle(IIparam["raRange"], unit='hourangle').to('deg').value
+            ra_range = Angle(IIparam["raRange"], unit='hourangle').to('deg').value.tolist()
             dec_range = IIparam["decRange"]
             mag_range = IIparam["magRange"]
             #specifies the lowest altitude your observatory can observe
