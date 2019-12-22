@@ -53,7 +53,8 @@ def chi_square_anal(tel_tracks, airy_func, star_err, guess_r, ang_diam, star_nam
     else:
         plt.show()
 
-def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, fullAiry=False):
+def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, pererr,
+                      fullAiry=False):
     rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
                                                            x_0=airy_func.x_0.value, y_0=airy_func.y_0.value)
     yerr = np.random.normal(0, star_err, avgamp.shape)
@@ -67,35 +68,38 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     tr_rad = rads.ravel()
     tr_amp = amps.ravel()
     rs = np.argsort(tr_rad)
-    plt.figure(figsize=(28, 20))
+    plt.figure(figsize=(22, 16))
     plt.errorbar(x=tr_Irad,
                  y=tr_Ints + yerr.ravel(),
                  fmt='o',
                  yerr=np.full(np.alen(tr_Ints), star_err),
                  label="Simulated Data",
-                 linewidth=2)
-    plt.scatter(tr_Irad, tr_Ints, label="Acutal Integration", s=120, color="r")
-    plt.plot(tr_rad[rs], IImodels.airy1D(tr_rad, airy_fitr)[rs], linestyle="--", label="Fitted Airy Function",
-             linewidth=4)
-
+                 linewidth=2,
+                 markersize=10)
+    # plt.scatter(tr_Irad, tr_Ints, label="Actual Integration", s=120, color="r")
+    #
+    # plt.plot(tr_rad[rs], IImodels.airy1D(tr_rad, airy_fitr)[rs], linestyle="--", label="Fitted Airy Function",
+    #          linewidth=4)
     if fullAiry:
         full_x = np.linspace(start=0,
-                             stop=np.max(tr_rad)+5,
+                             stop=np.max(tr_rad) + 5,
                              num=1000)
         full_y = IImodels.airy1D(full_x, guess_r)
-        plt.plot(full_x, full_y, '-', label="True Airy Function", linewidth=3)
+        plt.plot(full_x, full_y, '-', label="Uniform Disk Model", linewidth=3, color='black')
         title = "Star %s" % (star_name)
-
     else:
-        plt.plot(tr_rad[rs], tr_amp[rs], '-', label="True Airy Function", linewidth=3)
+        plt.plot(tr_rad[rs], tr_amp[rs], '-', label="Uniform Disk Model", linewidth=3)
         title = "Star %s Integration time of %s\n fit mas of data is %s +- %s or %.2f percent" % (
             star_name, ITime, fit_diam, fit_err, fit_err / fit_diam * 100)
-    plt.title(title, fontsize=28)
+    highy = IImodels.airy1D(full_x, guess_r + pererr/100*guess_r)
+    lowy = IImodels.airy1D(full_x, guess_r - pererr/100*guess_r)
+    plt.fill_between(full_x, lowy, highy, color='grey', alpha='0.5')
+    # plt.title(title, fontsize=28)
     plt.legend(fontsize=28)
-    plt.xlabel("Meters", fontsize=22)
-    plt.ylabel("Visibility^2", fontsize=22)
-    plt.tick_params(axis='both', which='major', labelsize=20)
-    plt.tick_params(axis='both', which='minor', labelsize=18)
+    plt.xlabel("Projected Baseline (m)", fontsize=36)
+    plt.ylabel("$|V(r)|^2$", fontsize=36)
+    plt.tick_params(axis='both', which='major', labelsize=28)
+    plt.tick_params(axis='both', which='minor', labelsize=28)
 
     if save_dir:
         graph_saver(save_dir, title+"1D")
@@ -113,19 +117,19 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
                extent=[-x_0, x_0, -y_0, y_0],
                cmap='gray')
     for i, track in enumerate(tel_tracks):
-        plt.plot(track[0][:, 0], track[0][:, 1], linewidth=4, color='b')
+        plt.plot(track[0][:, 0], track[0][:, 1], linewidth=6, color='b')
         # plt.text(track[0][:, 0][5], track[0][:, 1][5], "Baseline %s" % (baselines[i]), fontsize=14, color='w')
-        plt.plot(track[1][:, 0], track[1][:, 1], linewidth=4, color='b')
+        plt.plot(track[1][:, 0], track[1][:, 1], linewidth=6, color='b')
         # plt.text(track[1][:, 0][5], track[1][:, 1][5], "Baseline %s" % (-baselines[i]), fontsize=14, color='w')
     starttime = veritas_tels.time_info.T + veritas_tels.observable_times[0]
     endtime = veritas_tels.time_info.T + veritas_tels.observable_times[-1]
     title = "Coverage of %s at VERITAS \non %s UTC" % (
         star_name, veritas_tels.time_info.T)
-    plt.title(title, fontsize=20)
-    plt.xlabel("U (meters)", fontsize=22)
-    plt.ylabel("V (meters)", fontsize=22)
-    plt.tick_params(axis='both', which='major', labelsize=20)
-    plt.tick_params(axis='both', which='minor', labelsize=18)
+    # plt.title(star_name, fontsize=28)
+    plt.xlabel("U (m)", fontsize=36)
+    plt.ylabel("V (m)", fontsize=36)
+    plt.tick_params(axis='both', which='major', labelsize=28)
+    plt.tick_params(axis='both', which='minor', labelsize=28)
 
     plt.colorbar()
 

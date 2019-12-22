@@ -16,10 +16,13 @@ norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 sep_line = "-----------------------------------------------------------------------------------------------------------"
 red_line = '\n\x1b[1;31;40m' + sep_line + '\x1b[0m\n'
 
+
+
+
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
 
-def do_plots(tel_array, baselines, tel_tracks, airy_func, star_err, guess_r, wavelength, name, I_time, star_save):
+def do_plots(tel_array, baselines, tel_tracks, ang_diam, airy_func, star_err, guess_r, wavelength, name, I_time, pererr, star_save):
     IIdisplay.uvtrack_model_run(tel_tracks=tel_tracks,
                                 airy_func=airy_func,
                                 star_err=star_err,
@@ -28,6 +31,7 @@ def do_plots(tel_array, baselines, tel_tracks, airy_func, star_err, guess_r, wav
                                 star_name=name,
                                 ITime=I_time,
                                 save_dir=star_save,
+                                pererr=pererr,
                                 fullAiry=True)
 
     IIdisplay.uvtracks_airydisk2D(tel_tracks=tel_tracks,
@@ -43,7 +47,7 @@ def do_plots(tel_array, baselines, tel_tracks, airy_func, star_err, guess_r, wav
                               airy_func=airy_func,
                               star_err=star_err,
                               guess_r=guess_r,
-                              ang_diam=star["ANGD"],
+                              ang_diam=ang_diam,
                               star_name=name,
                               save_dir=star_save)
 
@@ -55,7 +59,7 @@ def star_info(star, wavelength):
     ra = star["RA"] * u.hourangle
     dec = star["DEC"] * u.deg
 
-    if sim_inlcuded:
+    if "SimBMAG" in star.colnames:
         star_mag = star["SimBMAG"]
     else:
         star_mag = star["MAG"]
@@ -65,8 +69,7 @@ def star_info(star, wavelength):
     star_id = str(ra) + str(dec)
     return name, ra, dec, star_mag, ang_diam, guess_diam, star_id
 
-
-def star_model(tel_array, I_time, star_mag, ang_diam, wavelength):
+def star_model(tel_array, I_time, star_mag, ang_diam, wavelength, star_id):
     star_err = IItools.track_error(sig0=tel_array.err_sig,
                                    m0=tel_array.err_mag,
                                    m=star_mag,
@@ -250,7 +253,6 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                                   "BSSkyD", "BSSpT", "BSRV",
                                   "ErrAmp", "TotObsTime", "ObsTime"))
 
-    data_table.pprint(max_lines=-1, max_width=-1)
 
     return data_table
 
@@ -313,6 +315,115 @@ def catalog_builder(tel_array, cat_name="MasterSIICatalog"):
     ascii.write(masterSII_cat, cat_name)
     absdf=123
 
+def catalog_interaction(master_SII_cat):
+
+    cls()
+    truncated_print = True
+    if "PerFitErr" in master_SII_cat.columns:
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT", "PerFitErr", "PerFailFit"]
+    else:
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT"]
+
+
+    master_SII_cat[truncvals].pprint(max_lines=-1,max_width=-1)
+    stop_sel = 'n'
+
+
+
+    while True:
+        mode = input("\nEnter a star's index value to do a single analysis\n"
+                     "Enter 'rankall' to do a full catalog ranking\n"
+                     "Enter 'toggleinfo' to show/hide all available catalog information\n"
+                     "Enter 'q' to quit\n"
+                     ": ")
+
+        if mode.lower() == 'rankall':
+            print("Ranking all stars")
+            break
+        elif mode.lower() == "q":
+            print("quitting ASIIP")
+            sys.exit()
+
+        elif mode.lower() == "toggleinfo":
+            truncated_print = not truncated_print
+            if truncated_print:
+                print("\nTruncated printing is now activated\n")
+                master_SII_cat["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT"].pprint(max_lines=-1, max_width=-1)
+            else:
+                print("\nTruncated printing has been deactivated\n")
+                master_SII_cat.pprint(max_lines=-1, max_width=-1)
+
+
+        else:
+            try:
+                selection = int(mode)
+                star = master_SII_cat[selection]
+                name, ra, dec, star_mag, ang_diam, guess_diam, star_id = star_info(star, wavelength)
+                tel_array.star_track(ra=ra,
+                                     dec=dec,
+                                     alt_cut=alt_cut,
+                                     obs_start=obs_start,
+                                     obs_end=obs_end,
+                                     Itime=int_time)
+                I_time = tel_array.star_dict[star_id]["IntDelt"]
+
+                if I_time:
+                    star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func = \
+                        star_model(tel_array=tel_array, I_time=I_time, star_mag=star_mag, ang_diam=ang_diam,
+                                   wavelength=wavelength, star_id=star_id)
+                    # This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
+                    # can use this function as a template to create another analysis technique
+                    runs = boot_runs * 2
+                    fdiams, ferrs, ffit = \
+                        IItools.IIbootstrap_analysis_airyDisk(tel_tracks=tel_tracks,
+                                                              airy_func=airy_func,
+                                                              star_err=star_err,
+                                                              guess_diam=guess_diam,
+                                                              wavelength=wavelength,
+                                                              runs=runs)
+                    fit_err = np.nanstd(fdiams) / np.nanmedian(fdiams) * 100
+                    failed_fit = ffit / runs * 100
+
+                    cls()
+
+                    if truncated_print: master_SII_cat[truncvals].pprint(max_lines=-1,max_width=-1)
+                    else: master_SII_cat.pprint(max_lines=-1, max_width=-1)
+
+
+                    print(red_line)
+                    if truncated_print: print(star[truncvals])
+                    else: print(star)
+                    print("\x1b[1;32;40m' The fit error is %.3f%%, the failed fit is %.3f%% \x1b[0m\n" % (
+                        fit_err, failed_fit))
+                    print(red_line)
+
+                    if save_plots: star_save = os.path.join(save_dir, name)
+                    else: star_save = False
+
+                    guess_r = airy_func.radius.value
+
+                    do_plots(tel_array=tel_array,
+                             baselines=baselines,
+                             tel_tracks=tel_tracks,
+                             ang_diam=star["ANGD"],
+                             airy_func=airy_func,
+                             star_err=star_err,
+                             guess_r=guess_r,
+                             wavelength=wavelength,
+                             name=name,
+                             I_time=I_time,
+                             pererr=fit_err,
+                             star_save=star_save)
+
+
+                else:
+                    print("\nSorry, that star isn't visible for the times you defined.\n")
+
+            except Exception as e:
+                print(e)
+                print("\nI'm sorry, but that response doesn't actually mean anything to ASIIP.\n")
+
+    return mode.lower()
 
 
 if __name__ == "__main__":
@@ -331,6 +442,7 @@ if __name__ == "__main__":
             time = IIparam["time"]
             observatory_name = IIparam["obsName"]
 
+            hour_ra = IIparam["raRange"]
             ra_range = Angle(IIparam["raRange"], unit='hourangle').to('deg').value.tolist()
             dec_range = IIparam["decRange"]
             mag_range = IIparam["magRange"]
@@ -377,7 +489,7 @@ if __name__ == "__main__":
 
             #this is the name of the output save file
             cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f.siicat"%\
-                       (observatory_name,time, mag_range[0], mag_range[1], obs_start, obs_end, ra_range[0], ra_range[1])
+                       (observatory_name,time, mag_range[0], mag_range[1], obs_start, obs_end, hour_ra[0], hour_ra[1])
             curdir = os.path.dirname(__file__)
             #this is the directory where all analysis graphs will be saved.
             save_dir = os.path.join(curdir, "IIGraphs")
@@ -420,7 +532,10 @@ if __name__ == "__main__":
             print("%s: %s" % (i, cat))
         print(red_line)
 
-        cat_choice = input("Catalogs have been found, enter a number to choose one or anything else to make a new one: ")
+        cat_choice = input("\nCatalogs have been found "
+                           "Enter a catalogs index number printed above and to the catalogs left to load one\n"
+                           "Enter anything else to create a new catalog\n"
+                           ": ")
         try:
             cat_choice = int(cat_choice)
             master_SII_cat = ascii.read(cats[cat_choice])
@@ -430,92 +545,15 @@ if __name__ == "__main__":
             catalog_builder(tel_array=tel_array, cat_name=cat_name)
             master_SII_cat = ascii.read(cat_name)
     else:
-        print("No catalog %s found, creating a new catalog."%(cat_name))
+        print("\nNo catalog %s found, creating a new catalog.\n"%(cat_name))
         catalog_builder(tel_array=tel_array, cat_name=cat_name)
         master_SII_cat = ascii.read(cat_name)
 
 
 
-    master_SII_cat.pprint(max_lines=-1, max_width=-1)
-    stop_sel = 'n'
 
 
-
-
-    sim_inlcuded = "SimBMAG" in master_SII_cat.columns
-
-    while True:
-        mode = input("Enter a star to analyze by index, type 'all' to do a full ranking, or 'q' to quit: ")
-
-        if mode == 'all':
-            print("Ranking all stars")
-            break
-        if mode == "q":
-            print("quitting ASIIP")
-            sys.exit()
-        try:
-            selection = int(mode)
-            star = master_SII_cat[selection]
-            name, ra, dec, star_mag, ang_diam, guess_diam, star_id = star_info(star, wavelength)
-            tel_array.star_track(ra=ra,
-                                 dec=dec,
-                                 alt_cut=alt_cut,
-                                 obs_start=obs_start,
-                                 obs_end=obs_end,
-                                 Itime=int_time)
-            I_time = tel_array.star_dict[star_id]["IntDelt"]
-
-
-            if I_time:
-                star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func = \
-                    star_model(tel_array=tel_array,
-                               I_time=I_time,
-                               star_mag=star_mag,
-                               ang_diam=ang_diam,
-                               wavelength=wavelength)
-                #This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
-                #can use this function as a template to create another analysis technique
-                runs = boot_runs*2
-                fdiams, ferrs, ffit = \
-                    IItools.IIbootstrap_analysis_airyDisk(tel_tracks=tel_tracks,
-                                                          airy_func=airy_func,
-                                                          star_err=star_err,
-                                                          guess_diam=guess_diam,
-                                                          wavelength=wavelength,
-                                                          runs=runs)
-                fit_err = np.nanstd(fdiams)/np.nanmedian(fdiams)*100
-                failed_fit = ffit/runs*100
-
-                cls()
-                master_SII_cat.pprint(max_lines=-1, max_width=-1)
-                print(red_line)
-                print(star)
-                print("\x1b[1;32;40m' The fit error is %.3f%%, the failed fit is %.3f%% \x1b[0m\n"%(fit_err, failed_fit))
-                print(red_line)
-
-                if save_plots: star_save = os.path.join(save_dir, name)
-                else: star_save = False
-
-                guess_r = airy_func.radius.value
-
-                do_plots(tel_array=tel_array,
-                         baselines=baselines,
-                         tel_tracks=tel_tracks,
-                         airy_func=airy_func,
-                         star_err=star_err,
-                         guess_r=guess_r,
-                         wavelength=wavelength,
-                         name=name,
-                         I_time=I_time,
-                         star_save=star_save)
-
-
-            else:
-                print("Sorry, that star isn't visible for the times you defined.\n")
-
-        except Exception as e:
-            print(e)
-            print("I'm sorry, but that response doesn't actually mean anything to ASIIP.\n")
+    catalog_interaction(master_SII_cat)
 
 
 
@@ -556,11 +594,8 @@ if __name__ == "__main__":
 
 
             star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func = \
-                star_model(tel_array=tel_array,
-                           I_time=I_time,
-                           star_mag=star_mag,
-                           ang_diam=ang_diam,
-                           wavelength=wavelength)
+                star_model(tel_array=tel_array, I_time=I_time, star_mag=star_mag, ang_diam=ang_diam,
+                           wavelength=wavelength, star_id=star_id)
             #This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
             #can use this function as a template to create another analysis technique
             fdiams, ferrs, ffit = \
@@ -621,7 +656,6 @@ if __name__ == "__main__":
     lowerr = np.argsort(master_SII_cat, order=["PerFailFit", "PerFitErr"])
     rasort = np.argsort(master_SII_cat, order=["RA"])
 
-    from astroquery.simbad import Simbad
 
     # asdqwer=1239
 
@@ -657,64 +691,13 @@ if __name__ == "__main__":
 
     master_SII_cat["Index"] = ind_col
 
-    # master_SII_cat["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT", "PerFitErr", "PerFailFit"].pprint(max_lines=-1,
-    #                                                                                              max_width=-1)
-    master_SII_cat.pprint(max_lines=-1, max_width=-1)
 
 
 
+    response = catalog_interaction(master_SII_cat)
 
-    # stable_targs = np.where((master_SII_cat[lowerr]["PerFitErr"] < 20) & (master_SII_cat[lowerr]["MAG"] < 4))
-    # print(np.alen(master_SII_cat[lowerr][stable_targs]))
-
-    response = input("\nEnter an index you wish to make graphs of or enter 'q' to quit\n")
-    while(response!='q'):
-        try:
-            n = int(response)
-            star = master_SII_cat[n]
-            name, ra, dec, star_mag, ang_diam, guess_diam, star_id = star_info(star, wavelength)
-            I_time = tel_array.star_dict[star_id]["IntDelt"]
-
-            star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func = \
-                star_model(tel_array=tel_array,
-                           I_time=I_time,
-                           star_mag=star_mag,
-                           ang_diam=ang_diam,
-                           wavelength=wavelength)
-
-            guess_r = airy_func.radius.value
-            star_save = os.path.join(save_dir, name)
-
-
-            if not save_plots:
-                star_save = False
-
-            cls()
-            master_SII_cat.pprint(max_lines=-1, max_width=-1)
-            do_plots(tel_array=tel_array,
-                     baselines=baselines,
-                     tel_tracks=tel_tracks,
-                     airy_func=airy_func,
-                     star_err=star_err,
-                     guess_r=guess_r,
-                     wavelength=wavelength,
-                     name=name,
-                     I_time=I_time,
-                     star_save=star_save)
-
-
-        except Exception as e:
-            print(e)
-            print("A bad index was entered or a star that cannot be observed was chosen, try again.\n")
-
-        response = input("\nEnter an index you wish to make graphs of or enter 'q' to quit: ")
-
-    cat_name = "%sCatalog%smag%sto%s_obsstart_%s_obsend_%sRA%sTo%s.siicat" % \
-               (observatory_name, time, mag_range[0], mag_range[1], obs_start, obs_end, ra_range[0], ra_range[1])
-
-    # ind_col = col(np.arange(np.alen(master_SII_cat)), name="Index")
-    #
-    # master_SII_cat = master_SII_cat[lowerr]
+    if response == "rankall":
+        print("\nYou just ranked all these stars silly! Just run ASIIP again if you want to do the ranking all over again.")
 
     master_SII_cat["Index"] = ind_col
 
