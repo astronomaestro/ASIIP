@@ -7,7 +7,7 @@ from scipy.special import j1, jn_zeros
 
 from matplotlib import pyplot as plt
 
-norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
+#norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
 
 
@@ -141,15 +141,16 @@ def binary_visibility2D(shape, flux_ratio, separation, wavelength, arcsec1, arcs
 
     cen_offset = 1.22*met_wav/sep_rad/2
 
-    V_1, v1func = airy_disk2D(shape, xpos, ypos, arcsec1, wavelength)
-    V_2, v2func = airy_disk2D(shape, xpos, ypos, arcsec2, wavelength)
+    # V_1, v1func = airy_disk2D(shape, xpos, ypos, arcsec1, met_wav)
+    # V_2, v2func = airy_disk2D(shape, xpos, ypos, arcsec2, met_wav)
+    #
+    # norm = viz.ImageNormalize(1, stretch=viz.LogStretch())
+    #
+    # v1_v2_term = V_1 ** 2 + (flux_ratio * V_2) ** 2
+    # abs_term = 2 * flux_ratio * np.abs(V_1) * np.abs(V_2)
 
 
-
-
-
-    v1_v2_term = V_1**2 + (flux_ratio*V_2)**2
-    abs_term = 2*flux_ratio*np.abs(V_1)*np.abs(V_2)
-    cos_term = np.cos(2*np.pi/met_wav * 0*np.cos(0*sep_rad))
-    result = v1_v2_term * abs_term * cos_term / (1 + flux_ratio) ** 2
+    baselines_vec = met_wav*np.sqrt((x - xpos) ** 2 + (y - ypos) ** 2)
+    cos_term = np.cos(2 * np.pi / met_wav * np.dot(baselines_vec, sep_rad))
+    result = (1 + flux_ratio ** 2 + 2 * flux_ratio * cos_term) / (1 + flux_ratio) ** 2
     return result

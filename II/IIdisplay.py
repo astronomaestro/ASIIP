@@ -3,7 +3,7 @@ import astropy.units as u
 import astropy.visualization as viz
 from astropy.coordinates import Angle
 from II import IItools, IImodels
-norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
+#norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os
 

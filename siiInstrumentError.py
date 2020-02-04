@@ -4,7 +4,7 @@
 import numpy as np
 
 #The magnitude of the target you are measuring
-m = 1.9
+m = 1.93
 #Your integration time in seconds
 T = 1800
 #the electronic bandwidth of your detector in Hz
@@ -14,7 +14,7 @@ v_area = 6**2 * np.pi
 #The quantum efficiency associated with the detector
 quant_eff = .1
 #A calibration constant determined empirically
-C = 2.05
+C = 2.0
 
 
 

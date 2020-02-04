@@ -12,7 +12,7 @@ from astropy.coordinates import Angle
 import json
 import sys
 import time as timer
-norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
+#norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 sep_line = "-----------------------------------------------------------------------------------------------------------"
 red_line = '\n\x1b[1;31;40m' + sep_line + '\x1b[0m\n'
 
@@ -432,9 +432,9 @@ if __name__ == "__main__":
 
     try:
         if np.alen(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "IIparameters.json"
+        else: param_file_name = "ExampleSIIparameters.json"
 
-        #Read in parameters from the parameter file
+        #Read in all parameters from the parameter file to make sure everything will run correctly
         with open(param_file_name) as param:
             #I use json as it is clear from the file itself what the variables are.
             IIparam = json.load(param)
@@ -697,7 +697,7 @@ if __name__ == "__main__":
     response = catalog_interaction(master_SII_cat)
 
     if response == "rankall":
-        print("\nYou just ranked all these stars silly! Just run ASIIP again if you want to do the ranking all over again.")
+        print("\nYou just ranked all these stars silly! Restart ASIIP if you want to do the ranking all over again.")
 
     master_SII_cat["Index"] = ind_col
 
