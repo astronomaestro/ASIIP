@@ -100,7 +100,7 @@ def fit_airy_avg(rads, avg_rads, avg_amps, err, guess_r):
         mod_Int = np.array([IItools.trapezoidal_average(airy1D(rad, r)) for rad in rads])
         return mod_Int.ravel()
 
-    sigmas = np.full(np.alen(avg_amps.ravel()), err)
+    sigmas = np.full(len(avg_amps.ravel()), err)
     smartFit, serr = curve_fit(f=airy_avg,
                                xdata=avg_rads.ravel(),
                                ydata=avg_amps.ravel(),
@@ -120,7 +120,7 @@ def fit_airy(avg_rads, avg_amps, err, guess_r):
     :param guess_r:
     :return:
     """
-    sigmas = np.full(np.alen(avg_amps.ravel()), err)
+    sigmas = np.full(len(avg_amps.ravel()), err)
 
     avgp, avgerr = curve_fit(f=airy1D,
                              xdata=avg_rads.ravel(),

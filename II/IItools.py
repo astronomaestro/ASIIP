@@ -76,7 +76,7 @@ def array_baselines(tel_locs):
     :param tel_locs: The x,y,z coordinates of your telescopes relative to a central position, in meters.
     :return: the calculated baselines for the given telescope positions
     """
-    n = np.alen(tel_locs)
+    n = len(tel_locs)
     N = n*(n-1)/2
     baselines = []
 
@@ -181,7 +181,7 @@ def trapezoidal_average(num_f):
     :param num_f:
     :return:
     """
-    if np.alen(num_f)>1:
+    if len(num_f)>1:
         fa = num_f[:-1]
         fb = num_f[1:]
         func_avg = (fa + fb)/2

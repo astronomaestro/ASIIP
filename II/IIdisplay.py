@@ -72,7 +72,7 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     plt.errorbar(x=tr_Irad,
                  y=tr_Ints + yerr.ravel(),
                  fmt='o',
-                 yerr=np.full(np.alen(tr_Ints), star_err),
+                 yerr=np.full(len(tr_Ints), star_err),
                  label="Simulated Data",
                  linewidth=2,
                  markersize=10)
@@ -140,7 +140,7 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
 
 def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise=None):
     noise_array = 0
-    nlen = np.alen(varray.star_dict[star_id]["IntTimes"])-1
+    nlen = len(varray.star_dict[star_id]["IntTimes"])-1
     if noise:
         noise_array = np.random.normal(0,err,nlen)
     x_0 = airy_func.x_0.value
@@ -152,7 +152,7 @@ def uvtracks_integrated(varray, tel_tracks, airy_func,save_dir, name, err, noise
         airy_amp = airy_func(utrack, vtrack)
         airy_radius = np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2)
         airy_I, trap_err, Irads = IItools.trap_w_err(airy_amp, airy_radius, err, err)
-        airy_err = np.ones(np.alen(airy_I)) * err
+        airy_err = np.ones(len(airy_I)) * err
         plt.errorbar(x=.5*Irads + airy_radius[:-1], y=airy_I / Irads + noise_array, yerr=airy_err,xerr=Irads, fmt='o')
         plt.plot(airy_radius, airy_amp)
     title = "UV integration times vs integration for %s" % (name)
@@ -186,7 +186,7 @@ def uv_tracks_plot(tel_tracks, veritas_tels, baselines, arcsec, save_dir):
 
 def uvtracks_amplitudes(tel_tracks, baselines, airy_func, arcsec, wavelength, save_dir, name, err):
     plt.figure(figsize=(28, 28))
-    subplot_num = np.ceil(np.alen(baselines) ** .5)
+    subplot_num = np.ceil(len(baselines) ** .5)
     x_0 = airy_func.x_0.value
     y_0 = airy_func.y_0.value
     for i, track in enumerate(tel_tracks):
@@ -211,7 +211,7 @@ def uvtracks_amplitudes(tel_tracks, baselines, airy_func, arcsec, wavelength, sa
         vtrack = track[0][:, 1] + y_0
         airy_amp = airy_func(utrack, vtrack)
         airy_radius = np.sqrt((utrack - x_0) ** 2 + (vtrack - y_0) ** 2)
-        yerr = np.full(np.alen(airy_radius), err)
+        yerr = np.full(len(airy_radius), err)
         plt.errorbar(x=airy_radius[0::ebar_density], y=airy_amp[0::ebar_density], yerr=yerr[0::ebar_density], fmt='o')
         plt.plot(airy_radius, airy_amp, 'o')
     plt.title("UV radius Vs ampltiude coverage")

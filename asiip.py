@@ -129,9 +129,9 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
 
 
 
-        if np.alen(pos_cat) ==0:continue
+        if len(pos_cat) ==0:continue
         if coords_done == None:
-            closest_star, skydis, distance3d = (np.array([]), Angle(np.ones(np.alen(ras)),unit=u.rad), np.full(np.alen(ras),True))
+            closest_star, skydis, distance3d = (np.array([]), Angle(np.ones(len(ras)),unit=u.rad), np.full(len(ras),True))
             coords_done = SkyCoord(good_ra, good_dec, unit=("hourangle", "deg"))
 
         else:
@@ -144,7 +144,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
         # the indicies where the matched pos_cat star is large enough to be considered a unique star
         unq_idx = skydis > 1 * u.arcsec
 
-        dists = np.full(np.alen(ras),np.inf)
+        dists = np.full(len(ras),np.inf)
         rs = np.argsort(ras)
         dup_diams = []
         i = 0
@@ -160,10 +160,10 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                                      dec=dec,
                                      alt_cut=alt_cut)
 
-                if tel_array.star_dict[star_id]["ObsTimes"]:
-                    if np.alen(tel_array.star_dict[star_id]["ObsTimes"]) > 1:
+                if not np.isnan(tel_array.star_dict[star_id]["ObsTimes"]).any():
+                    if len(np.array(tel_array.star_dict[star_id]["ObsTimes"])) > 1:
                         # total_obs_time = np.ptp(tel_array.star_dict[star_id]["ObsTimes"])
-                        total_obs_time = (tel_array.time_delt * np.alen(tel_array.star_dict[star_id]["ObsTimes"])).to('s')
+                        total_obs_time = (tel_array.time_delt * len(tel_array.star_dict[star_id]["ObsTimes"])).to('s')
                     else: total_obs_time=0*u.hour
 
                 if total_obs_time <= cutoff_obs_time * u.hour:
@@ -188,7 +188,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                 cat_names.append(cat_name)
                 total_obs_times.append(total_obs_time.to('s').value)
 
-                if np.alen(dup_diams) > 1:
+                if len(dup_diams) > 1:
                     adsf=234
                 dup_count.append(dup_diams)
                 dup_diams = []
@@ -211,7 +211,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
     if Int_obst == None:
         Int_obst = np.array(total_obs_times)
     else:
-        Int_obst = np.full(np.alen(total_obs_times), Int_obst)
+        Int_obst = np.full(len(total_obs_times), Int_obst)
 
     bs_mat, bs_dis, bs_3dis = SkyCoord(good_ra,
                                        good_dec,
@@ -310,7 +310,7 @@ def catalog_builder(tel_array, cat_name="MasterSIICatalog"):
     errAsort = np.argsort(masterSII_cat['ErrAmp'])
     masterSII_cat = masterSII_cat[errAsort]
     #Save the completed master SII catalog
-    ind_col = col(np.arange(np.alen(masterSII_cat)), name="Index")
+    ind_col = col(np.arange(len(masterSII_cat)), name="Index")
     masterSII_cat.add_column(ind_col, index=0)
     ascii.write(masterSII_cat, cat_name)
     absdf=123
@@ -431,7 +431,7 @@ if __name__ == "__main__":
     print("Welcome to ASIIP (A Stellar Intensity Interferometry Planner). Please make sure you are running the catalog for the desire night.\n")
 
     try:
-        if np.alen(sys.argv) > 1: param_file_name = sys.argv[1]
+        if len(sys.argv) > 1: param_file_name = sys.argv[1]
         else: param_file_name = "ExampleSIIparameters.json"
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
@@ -525,7 +525,7 @@ if __name__ == "__main__":
     print("Now running analysis.")
     cats = [ca for ca in os.listdir() if ".siicat" in ca]
 
-    if np.alen(cats) > 0:
+    if len(cats) > 0:
 
         print(red_line)
         for i, cat in enumerate(cats):
@@ -666,13 +666,13 @@ if __name__ == "__main__":
     #                                                     radius=max_radius)
     #
     # #
-    # # varInfo = np.full(np.alen(lowerr), "---------")
+    # # varInfo = np.full(len(lowerr), "---------")
     # # varInfo[cep_mat] = cep_res["VarType"]
-    # # gcvsNames = np.full(np.alen(lowerr),"---------")
+    # # gcvsNames = np.full(len(lowerr),"---------")
     # # gcvsNames[cep_mat] = cep_res["GCVS"]
-    # # matchDis = np.full(np.alen(lowerr), "---------")
+    # # matchDis = np.full(len(lowerr), "---------")
     # # matchDis[cep_mat] = cep_dis.to("mas")
-    # # # gcvsSpTy = np.full(np.alen(lowerr), "---------")
+    # # # gcvsSpTy = np.full(len(lowerr), "---------")
     # # # gcvsSpTy[cep_mat] = cep_res["SpType"]
     # #
     # # master_SII_cat.add_column(col(varInfo), name="VariableInfo")
@@ -685,7 +685,7 @@ if __name__ == "__main__":
     # stable_targs = np.where((master_SII_cat[lowerr]["PerFitErr"] < 20) & (master_SII_cat[lowerr]["MAG"] < 4))
 
 
-    ind_col = col(np.arange(np.alen(master_SII_cat)), name="Index")
+    ind_col = col(np.arange(len(master_SII_cat)), name="Index")
 
     master_SII_cat = master_SII_cat[lowerr]
 

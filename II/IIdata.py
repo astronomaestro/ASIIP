@@ -109,7 +109,7 @@ class IItelescope():
         sky_ind = np.where((self.sunaltazs.alt < sunangle*u.deg) & (starLoc.alt > alt_cut * u.deg))[0]
         observable_times = self.delta_time[sky_ind]
 
-        if np.alen(observable_times)==0:
+        if len(observable_times)==0:
             if ra_dec not in self.star_dict:self.star_dict[ra_dec] = {}
             self.star_dict[ra_dec]["ObsTimes"] = np.nan
             self.star_dict[ra_dec]["totTime"] = 0*u.s
@@ -134,7 +134,7 @@ class IItelescope():
             self.star_dict[ra_dec]["Alt"] = starLoc.alt[sky_ind]
             self.star_dict[ra_dec]["Airmass"] = starLoc.secz[sky_ind]
             self.observable_times = observable_times
-            self.star_dict[ra_dec]["totTime"] = (self.time_delt * np.alen(observable_times)).to('s')
+            self.star_dict[ra_dec]["totTime"] = (self.time_delt * len(observable_times)).to('s')
 
 
         # time_overlap = IItools.getIntersection([obs_start.to('h').value, obs_end.to('h').value],
@@ -144,7 +144,7 @@ class IItelescope():
             int_observable_times = self.int_delta_time[int_sky_ind]
             time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start-Itime) & (self.int_delta_time[int_sky_ind] <= obs_end+Itime))
 
-            if np.alen(ftime_range[0]) > 2:
+            if len(ftime_range[0]) > 2:
                 self.star_dict[ra_dec]["fIntTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
                                                           ftime_range] - starToTrack.ra
                 self.star_dict[ra_dec]["fIntDelt"] = self.star_dict[ra_dec]["fIntTimes"][1] - \
@@ -156,7 +156,7 @@ class IItelescope():
                 self.star_dict[ra_dec]["fIntTimes"] = None
                 self.star_dict[ra_dec]["fIntDelt"] = None
 
-            if np.alen(time_range[0]) > 1:
+            if len(time_range[0]) > 1:
                 self.star_dict[ra_dec]["IntTimes"] = self.int_delta_time[int_sky_ind][time_range]
                 self.star_dict[ra_dec]["IntDelt"] = Itime.to('h')
                 self.star_dict[ra_dec]["IntSideTimes"] = self.intTelFrame.obstime.sidereal_time('apparent')[int_sky_ind][time_range] - starToTrack.ra
