@@ -237,6 +237,7 @@ def graph_saver(save_dir, plot_name, fig = None):
     if not os.path.exists(save_dir):
         os.makedirs(save_dir)
     file_type = ".png"
+    plot_name = file_name_cleaner(plot_name,"")
     final_dir = os.path.join(save_dir,plot_name + file_type)
     if fig:
         fig.savefig(final_dir, bbox_inches = "tight")
@@ -247,5 +248,13 @@ def graph_saver(save_dir, plot_name, fig = None):
         plt.clf()
         plt.close()
     print(final_dir)
+
+def file_name_cleaner(file_name, file_ext):
+    if os.name == "nt":
+        print("You are running in windows, removing illegal characters from catalog name.")
+        clean_name = "".join(x for x in file_name if x.isalnum()) + file_ext
+    else:
+        clean_name = file_name + file_ext
+    return clean_name
 
 
