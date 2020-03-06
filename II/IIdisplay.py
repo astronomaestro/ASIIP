@@ -113,7 +113,7 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     airy_disk = airy_func(x, y)
     plt.figure(figsize=(20, 20))
     plt.imshow(airy_disk,
-               norm=viz.ImageNormalize(1, stretch=viz.LogStretch()),
+               norm=viz.ImageNormalize(airy_disk, stretch=viz.LogStretch()),
                extent=[-x_0, x_0, -y_0, y_0],
                cmap='gray')
     for i, track in enumerate(tel_tracks):

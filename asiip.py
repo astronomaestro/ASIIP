@@ -152,7 +152,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
             total_obs_time = 0 * u.hour
 
             dis = (ra.to('deg').value + dec.to("deg").value)
-            if unique and (ra.value not in calc_ra and dec.value not in calc_dec):
+            if unique and (ra.value not in calc_ra or dec.value not in calc_dec):
                 print("\nAnalyzing Star RA %s DEC %s at %s" % (ra, dec, i))
 
                 star_id = str(ra) + str(dec)
@@ -200,10 +200,25 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                 i = i + 1
             else:
                 print('|', end="")
-                dupind = calc_dec.index(dec.value)
-                dup_count[dupind].append([ang_diam.to("mas").value, ra, dec, 3,cat_name])
-                c=c+1
-                i=i+1
+                try:
+                    if dec.value in calc_dec:
+                        dupind = calc_dec.index(dec.value)
+                        dup_count[dupind].append([ang_diam.to("mas").value, ra, dec, 3, cat_name])
+                        c = c + 1
+                        i = i + 1
+                    elif ra.value in calc_ra:
+                        dupind = calc_ra.index(ra.value)
+                        dup_count[dupind].append([ang_diam.to("mas").value, ra, dec, 3, cat_name])
+                        c = c + 1
+                        i = i + 1
+
+                    else:
+                        print("Something went wrong with the indexing!!!!!!!!!!!!!")
+                        raise Exception("Something likely went wrong with the indexing.")
+
+                except Exception as e:
+                    print("Something went wrong with the indexing!!!!!!!!!!!!!")
+                    print(e)
 
     diamstd = np.array([np.std(np.array(np.array(r)[:,0],float)) for r in dup_count])
     diammean = np.array([np.median(np.array(np.array(r)[:,0],float)) for r in dup_count])
@@ -432,7 +447,7 @@ if __name__ == "__main__":
 
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "ExampleSIIparameters.json"
+        else: param_file_name = "IIparameters.json"
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
         with open(param_file_name) as param:
@@ -488,8 +503,17 @@ if __name__ == "__main__":
             save_plots = IIparam["savePlots"]
 
             #this is the name of the output save file
-            cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f.siicat"%\
-                       (observatory_name,time, mag_range[0], mag_range[1], obs_start, obs_end, hour_ra[0], hour_ra[1])
+
+            if os.name == "nt":
+                print("You are running in windows, removing illegal characters from catalog name.")
+                cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f" % \
+                           (observatory_name, time, mag_range[0], mag_range[1], obs_start, obs_end, hour_ra[0],
+                            hour_ra[1])
+                cat_name = "".join(x for x in cat_name if x.isalnum()) + ".siicat"
+            else:
+                cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f.siicat" % \
+                           (observatory_name, time, mag_range[0], mag_range[1], obs_start, obs_end, hour_ra[0],
+                            hour_ra[1])
             curdir = os.path.dirname(__file__)
             #this is the directory where all analysis graphs will be saved.
             save_dir = os.path.join(curdir, "IIGraphs")
@@ -528,7 +552,7 @@ if __name__ == "__main__":
     if len(cats) > 0:
 
         print(red_line)
-        for i, cat in enumerate(cats):
+        for i, cat in enumerate(sorted(cats)):
             print("%s: %s" % (i, cat))
         print(red_line)
 
@@ -693,6 +717,7 @@ if __name__ == "__main__":
 
 
 
+    ascii.write(master_SII_cat, "Ranked_%s"%(cat_name), overwrite=True)
 
     response = catalog_interaction(master_SII_cat)
 
@@ -702,7 +727,6 @@ if __name__ == "__main__":
     master_SII_cat["Index"] = ind_col
 
 
-    ascii.write(master_SII_cat, "Ranked_%s"%(cat_name), overwrite=True)
 
 
 # xvals=[]
