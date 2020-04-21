@@ -122,6 +122,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
     cat_names = []
     total_obs_times = []
     dup_count = []
+    time_ranges = []
     coords_done = None
     for catalog, cat_name in zip(tel_array.catalogs, tel_array.cat_names):
         ras, decs, ang_diams, mags, mag_name = tel_array.ra_dec_diam_getter(cat_name, catalog)
@@ -172,6 +173,9 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                     continue
 
                 dists[i] = dis
+                mintime = np.amin(tel_array.observable_times)
+                maxtime = np.amax(tel_array.observable_times)
+                time_range = "%.5sTo%.5s"%(mintime, maxtime)
                 calc_ra.append(ra.value)
                 calc_dec.append(dec.value)
                 dup_diams.append([ang_diam.to("mas").value, ra, dec, 1, cat_name])
@@ -187,7 +191,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                 good_mags.append(mag)
                 cat_names.append(cat_name)
                 total_obs_times.append(total_obs_time.to('s').value)
-
+                time_ranges.append(time_range)
                 if len(dup_diams) > 1:
                     adsf=234
                 dup_count.append(dup_diams)
@@ -248,22 +252,22 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
         sim_sptype = simbad_matches["SP_TYPE"]
         sim_bflux = simbad_matches["FLUX_B"]
         sim_id = simbad_matches["MAIN_ID"]
-        data_table = Table([sim_id.astype("U13"), good_ra, good_dec, good_diams, diammean, diamstd,
+        data_table = Table([sim_id.astype("U13"), good_ra, good_dec, good_diams, diammean, diamstd, time_ranges,
                             good_mag_names, good_mags, cat_names, bmag, vmag,
                             bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"], sim_bflux, sim_sptype, simd.to('mas'), sim_rotV,
                             col(amp_errs), col(total_obs_times, unit=u.second), col(Int_obst, unit=u.second)],
-                           names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd",
+                           names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd","ObservableTimes",
                                   "FILT","MAG","CAT","BS_BMAG","BS_VMAG",
                                   "BSSkyD", "BSSpT", "BSRV","SimBMAG", "SIMSpT", "SIMSkyD", "SIMRV",
                                   "ErrAmp", "TotObsTime", "ObsTime"))
     except Exception as e:
         print(e)
         print("SIMBAD probably failed, using the Bright Star Catalog only")
-        data_table = Table([bs_info["Name"], good_ra, good_dec, good_diams, diammean, diamstd,
+        data_table = Table([bs_info["Name"], good_ra, good_dec, good_diams, diammean, diamstd, time_ranges,
                             good_mag_names, good_mags, cat_names, bmag, vmag,
                             bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"],
                             col(amp_errs), col(total_obs_times, unit=u.second), col(Int_obst, unit=u.second)],
-                           names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd",
+                           names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd","ObservableTimes",
                                   "FILT","MAG","CAT","BS_BMAG","BS_VMAG",
                                   "BSSkyD", "BSSpT", "BSRV",
                                   "ErrAmp", "TotObsTime", "ObsTime"))
@@ -335,9 +339,9 @@ def catalog_interaction(master_SII_cat):
     cls()
     truncated_print = True
     if "PerFitErr" in master_SII_cat.columns:
-        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT", "PerFitErr", "PerFailFit"]
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT","ObservableTimes", "PerFitErr", "PerFailFit"]
     else:
-        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT"]
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT", "ObservableTimes"]
 
 
     master_SII_cat[truncvals].pprint(max_lines=-1,max_width=-1)
@@ -447,7 +451,7 @@ if __name__ == "__main__":
 
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "IIparameters.json"
+        else: param_file_name = "ExampleSIIparameters.json"
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
         with open(param_file_name) as param:
@@ -562,7 +566,7 @@ if __name__ == "__main__":
                            ": ")
         try:
             cat_choice = int(cat_choice)
-            master_SII_cat = ascii.read(cats[cat_choice])
+            master_SII_cat = ascii.read(sorted(cats)[cat_choice])
 
         except:
             print("That input wasn't a number, creating a new catalog.")
@@ -727,7 +731,42 @@ if __name__ == "__main__":
     master_SII_cat["Index"] = ind_col
 
 
-
+# xvals=[]
+# yvals=[]
+# midx=[]
+# midy=[]
+# badx=[]
+# bady=[]
+# ramps=[]
+# xn= "ANGD"
+# yn="BS_BMAG"
+# lowsky = np.where(master_SII_cat[lowerr]["BSSkyD"]<3000)
+#
+# for star in master_SII_cat[lowerr][lowsky]:
+#     if star["PerFitErr"]:
+#         n = star["Index"]
+#         trac = star_tracks[n]
+#         func = star_funcs[n]
+#         if star["PerFitErr"]>30:
+#             badx.append(star[xn])
+#             bady.append(star[yn])
+#         elif star["PerFitErr"]>20 and star["PerFitErr"]<30:
+#             midx.append(star[xn])
+#             midy.append(star[yn])
+#         elif star["PerFitErr"]<20:
+#             xvals.append(star[xn])
+#             yvals.append(star[yn])
+# fig = plt.figure(figsize=(14, 8))
+# plt.tick_params(axis='both', which='major', labelsize=28, length=10, width=4)
+# plt.tick_params(axis='both', which='minor', labelsize=28, length=10, width=4)
+# plt.tick_params(which="major", labelsize=24, length=8, width=3)
+# plt.tick_params(which="minor", length=6, width=2)
+# plt.ylabel("Bright Star Catalogue B magnitude", fontsize=26)
+# plt.xlabel("%s(mas)"%(xn), fontsize=26)
+# plt.semilogx(xvals,yvals,'o',label="PerFitErr is < 20%",color="b",marker='o')
+# plt.semilogx(midx,midy,'o',label="PerFitErr is 20% to 30% ",color="y",marker="^")
+# plt.semilogx(badx,bady,'o',label="PerFitErr is > 30%",color="r",marker="x")
+# plt.legend(fontsize=18)
 
 # xvals=[]
 # yvals=[]

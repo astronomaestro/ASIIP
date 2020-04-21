@@ -14,7 +14,7 @@
   "maxSunAltitude": -15,
   "observationStart": null,
   "observationEnd": null,
-  "sigmaTel": 0.01,
+  "sigmaTel": 0.028,
   "sigmaMag": 1.93,
   "sigmaTime": 1800,
   "bootStrapRuns":50,

@@ -12,7 +12,7 @@ electronic_bandwidth = 100 * 10**6
 #The total area of your telescope in meters
 v_area = 6**2 * np.pi
 #The quantum efficiency associated with the detector
-quant_eff = .1
+quant_eff = .25
 #A calibration constant determined empirically
 C = 2.0
 

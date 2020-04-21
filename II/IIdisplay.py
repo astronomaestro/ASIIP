@@ -3,7 +3,6 @@ import astropy.units as u
 import astropy.visualization as viz
 from astropy.coordinates import Angle
 from II import IItools, IImodels
-#norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 import numpy as np
 import os
 
@@ -13,13 +12,15 @@ def display_airy_disk(veritas_array, angd, wavelength, save_dir):
                                                 ypos=veritas_array.ylen / 2,
                                                 angdiam=angd,
                                                 wavelength=wavelength)
-    norm = viz.ImageNormalize(1, stretch=viz.LogStretch())
+    # norm = viz.ImageNormalize(1, stretch=viz.LogStretch())
 
     plt.figure(figsize=(80, 80))
 
     plt.title("The Airy disk of a %s Point Source"%(angd))
     plt.xlabel("Meters")
     plt.ylabel("Meters")
+    norm = viz.ImageNormalize(airy_disk, stretch=viz.SqrtStretch())
+
     plt.imshow(airy_disk, norm=norm, cmap="gray")
 
     if save_dir:
@@ -68,7 +69,7 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     tr_rad = rads.ravel()
     tr_amp = amps.ravel()
     rs = np.argsort(tr_rad)
-    plt.figure(figsize=(22, 16))
+    plt.figure(figsize=(18, 12))
     plt.errorbar(x=tr_Irad,
                  y=tr_Ints + yerr.ravel(),
                  fmt='o',
@@ -98,8 +99,12 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     plt.legend(fontsize=28)
     plt.xlabel("Projected Baseline (m)", fontsize=36)
     plt.ylabel("$|V(r)|^2$", fontsize=36)
-    plt.tick_params(axis='both', which='major', labelsize=28)
-    plt.tick_params(axis='both', which='minor', labelsize=28)
+
+    plt.tick_params(axis='both', which='major', labelsize=28, length=10, width=4)
+    plt.tick_params(axis='both', which='minor', labelsize=28, length=10, width=4)
+    plt.tick_params(which="major", labelsize=24, length=8, width=3)
+    plt.tick_params(which="minor", length=6, width=2)
+
 
     if save_dir:
         graph_saver(save_dir, title+"1D")
@@ -111,7 +116,8 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     y_0 = airy_func.y_0.value
     y, x = np.mgrid[:x_0 * 2, :y_0 * 2]
     airy_disk = airy_func(x, y)
-    plt.figure(figsize=(20, 20))
+    fig = plt.figure(figsize=(18, 12))
+
     plt.imshow(airy_disk,
                norm=viz.ImageNormalize(airy_disk, stretch=viz.LogStretch()),
                extent=[-x_0, x_0, -y_0, y_0],
@@ -126,12 +132,17 @@ def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r,
     title = "Coverage of %s at VERITAS \non %s UTC" % (
         star_name, veritas_tels.time_info.T)
     # plt.title(star_name, fontsize=28)
+
     plt.xlabel("U (m)", fontsize=36)
     plt.ylabel("V (m)", fontsize=36)
-    plt.tick_params(axis='both', which='major', labelsize=28)
-    plt.tick_params(axis='both', which='minor', labelsize=28)
+    plt.tick_params(axis='both', which='major', labelsize=28, length=10, width=4)
+    plt.tick_params(axis='both', which='minor', labelsize=28, length=10, width=4)
+    plt.tick_params(which="major", labelsize=24, length=8, width=3)
+    plt.tick_params(which="minor", length=6, width=2)
+    cbar = plt.colorbar()
+    cbar.ax.tick_params(labelsize=24, length=6, width=3)
 
-    plt.colorbar()
+
 
     if save_dir:
         graph_saver(save_dir, "CoverageOf%sOn%sUTC" % (star_name, veritas_tels.time_info.T))

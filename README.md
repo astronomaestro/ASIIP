@@ -18,7 +18,7 @@ the analytical fits converge to the true angular diameter fit value.
 completed catalog once the user quits.
 
 
-* Running the Script
+* Before you run the script
 
 Make sure you update your parameter file to match the physical characteristics of your array.
 
@@ -78,6 +78,31 @@ the script like this
      python interferometer.py (name of your parameter file).json
 
 
+* Using ASIIP
+
+Once you start ASIIP, you will be shown an initial message
+
+"Welcome to ASIIP (A Stellar Intensity Interferometry Planner). Please make sure you are running the catalog for the desire night."
+
+If you have catalogs saved to your system from previous analysis, ASIIP will allow you to choose from these previous catalogs or begin an entirely
+new analysis
+
+Once you load or create a catalog, you will be presented with four options
+
+    - "Enter a star's index value to do a single analysis"
+    This option allows you to do a quick analysis of a single target that is in the given catalog. Simply enter the associated
+    target number and it will give a simulated observation error
+    
+    - "Enter 'rankall' to do a full catalog ranking"
+    This option allows you to rank the full catalog and find the best targets to observe out of the given input targets
+    
+    - "Enter 'toggleinfo' to show/hide all available catalog information"
+    Because there is so much auxillary information associated with the given targets, much of a given catalogs information is
+    hidden by default. Simply enter 'toggleinfo' to see all of the auxillary target information
+    
+    - "Enter 'q' to quit"
+    Make sure to use q when exiting ASIIP to make sure any catalogs you have created are saved
+
 * How to interpret the results of the analysis
 
 Once the analysis has run it's course, it will print out a table with data on the input targets. A definition of the
@@ -97,6 +122,7 @@ columns is given below
     - BS\_VMAG: The cross matched Bright Star catalog V magnitude.
     - BSSkyD: The difference between the input RA and DEC vs the the cross matched Bright Star catalog RA and DEC in mas. If BSSkyD is not 0 it means that the RA and DEC don't match precisely. If this is large, it could indicate a mismatched entry.
     - BSSpT: The spectral type of the cross matched target as given by the Bright Star Catalog.
+    - ObservableTimes(hour): The range of times a target can be observed within the given observational constraints. A time of 0 is midnight, a time of -1 is an hour before midnight, a time of 1 would is an hour after midnight.
     - BSRV: The radial velocity of the cross matched target as given by the Bright Star Catalog in km/s.
     - SimBMAG: The SIMBAD catalog B magnitude of the cross matched target.
     - SIMSpT: The spectral type of the cross matched target as given by SIMBAD.
