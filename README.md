@@ -1,7 +1,8 @@
 # A Stellar Intensity Interferometry Target Planner (ASIIP)
 * What this target planner does
 
--A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally designed for VERITAS but can work with any Intensity Interferometry system. 
+-A general purpose Intensity Interferometry target planner that can be used for a given telescope array. It was initally 
+designed for VERITAS but can work with any Intensity Interferometry system. 
 
 -Queries 5 different catalogs with custom constraints defined by the user and constructs a master catalog from them. 
 It then cross checks found targets with the Bright Star Catalog and SIMBAD to obtain B magnitudes, radial velocities, 
@@ -20,28 +21,32 @@ completed catalog once the user quits.
 
 * Before you run the script
 
-Make sure you update your parameter file to match the physical characteristics of your array.
+For accurate results, make sure you update your parameter file to match the physical characteristics of your array and 
+that the error you have defined with the sigmaTel parameter is reasonable.
 
 If you need help determining the sigmaTel parameter, the siiInstrumentError.py script can provide a rough estimate.
 Simply change the variable in that script to match your SII instrument and it will give an estimate for the error 
 associated with a given integration time and target.
 
-This Python script was written using Python 3.7, so a Python 2 compiler might not work as expected. To run the target 
-planner, open a terminal (or command prompt) and change your directory to where interferometer.py is located and then 
-type this
-
-    python asiip.py
+This Python script was written using Python 3, so a Python 2 compiler might not work as expected.
 
 There are some package dependencies that you will need in order to get the script running.
-
-    - astropy (THE MOST UP TO DATE VERSION OF ASTROPY! Older versions use a server that's no longer available)
-    - astroquery
+   
+    - wheel
     - numpy
     - matplotlib 
+    - scipy
+    - astropy (The version that currently is tested is 4.0.1! Older astropy versions use a server that's no longer available so you will probably have to update your version if it's older)
+    - astroquery
 
-All of these should be easily installed using 'pip install (your package)'. If there happens to be any more packages you
-need use pip install should easily be able to help you with those as well.
+All of these should be easily installed using 'pip install (your package)'. This was tested on Mac OS Catalina and
+Windows 10. It should also work with unix distros such as Ubuntu, but the vast number of available distro's make
+it unfeasible to test each one so some tweaking may be necessary.
 
+To run the target planner, open a terminal (or command prompt) and change your directory to where interferometer.py is 
+located and then type this
+
+    python asiip.py
 
 * The Parameter input file
 

@@ -94,7 +94,7 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
             star_name, ITime, fit_diam, fit_err, fit_err / fit_diam * 100)
     highy = IImodels.airy1D(full_x, guess_r + pererr/100*guess_r)
     lowy = IImodels.airy1D(full_x, guess_r - pererr/100*guess_r)
-    plt.fill_between(full_x, lowy, highy, color='grey', alpha='0.5')
+    plt.fill_between(full_x, lowy, highy, color='grey', alpha=0.5)
     # plt.title(title, fontsize=28)
     plt.legend(fontsize=28)
     plt.xlabel("Projected Baseline (m)", fontsize=36)
