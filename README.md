@@ -46,11 +46,13 @@ it unfeasible to test each one so some tweaking may be necessary.
 To run the target planner, open a terminal (or command prompt) and change your directory to where interferometer.py is 
 located and then type this
 
-    python asiip.py
+    python asiip.py ExampleSIIparameters.json
+    
+The first argument 'asiip.py' is simply the name of the python script you are running. The second "ExampleSIIparameters.json" 
+is the name of the parameter file you want to load into ASIIP. This allows completely different telescope configurations
+to be used with ASIIP and is explained in additional detail below.
 
 * The Parameter input file
-
-    
     
 This is a json file which is used to modify the many differing parameters the script uses to calculate which targets to
 analyze. Description of the parameters are given below. If you want to see an example input values, look at the file

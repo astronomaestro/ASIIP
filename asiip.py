@@ -551,7 +551,7 @@ if __name__ == "__main__":
 
 
     print("Now running analysis.")
-    cats = [ca for ca in os.listdir() if ".siicat" in ca]
+    cats = [ca for ca in os.listdir() if ".siicat" in ca.lower()]
 
     if len(cats) > 0:
 
