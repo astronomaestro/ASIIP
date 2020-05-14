@@ -82,7 +82,7 @@ IIparameters.json included with this package.
 In the event you want multiple parameter files or you want to change the name of your parameter file you can by running 
 the script like this
 
-     python interferometer.py (name of your parameter file).json
+     python asiip.py <name of your parameter file>.json
 
 
 * Using ASIIP
