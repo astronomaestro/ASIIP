@@ -331,7 +331,7 @@ def catalog_builder(tel_array, cat_name="MasterSIICatalog"):
     #Save the completed master SII catalog
     ind_col = col(np.arange(len(masterSII_cat)), name="Index")
     masterSII_cat.add_column(ind_col, index=0)
-    ascii.write(masterSII_cat, cat_name)
+    ascii.write(masterSII_cat, cat_name, delimiter=',')
     absdf=123
 
 def catalog_interaction(master_SII_cat):
@@ -449,9 +449,13 @@ if __name__ == "__main__":
     cls()
     print("Welcome to ASIIP (A Stellar Intensity Interferometry Planner). Please make sure you are running the catalog for the desire night.\n")
 
+    curdir = os.path.dirname(__file__)
+    siicatalogsdir = os.path.join(curdir, "SIICatalogs")
+    if not os.path.exists(siicatalogsdir):
+        os.makedirs(siicatalogsdir)
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "ExampleSIIparameters.json"
+        else: param_file_name = "IIparameters.json"
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
         with open(param_file_name) as param:
@@ -510,14 +514,15 @@ if __name__ == "__main__":
 
             if os.name == "nt":
                 print("You are running in windows, removing illegal characters from catalog name.")
-                cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f" % \
+                cat_name = "%sSIICatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f" % \
                            (observatory_name, time, mag_range[0], mag_range[1], obs_start, obs_end, hour_ra[0],
                             hour_ra[1])
-                cat_name = "".join(x for x in cat_name if x.isalnum()) + ".siicat"
+                cat_name = "".join(x for x in cat_name if x.isalnum()) + ".csv"
             else:
-                cat_name = "%sCatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f.siicat" % \
+                cat_name = "%sSIICatalog%smag%.3fto%.3f_obsstart_%s_obsend_%sRA%.4fTo%.4f.csv" % \
                            (observatory_name, time, mag_range[0], mag_range[1], obs_start, obs_end, hour_ra[0],
                             hour_ra[1])
+            cat_name_dir = os.path.join("SIICatalogs", cat_name)
             curdir = os.path.dirname(__file__)
             #this is the directory where all analysis graphs will be saved.
             save_dir = os.path.join(curdir, "IIGraphs")
@@ -551,7 +556,7 @@ if __name__ == "__main__":
 
 
     print("Now running analysis.")
-    cats = [ca for ca in os.listdir() if ".siicat" in ca.lower()]
+    cats = [ca for ca in os.listdir("SIICatalogs")]
 
     if len(cats) > 0:
 
@@ -566,16 +571,17 @@ if __name__ == "__main__":
                            ": ")
         try:
             cat_choice = int(cat_choice)
-            master_SII_cat = ascii.read(sorted(cats)[cat_choice])
+            cat_choice_dir = os.path.join("SIIcatalogs", sorted(cats)[cat_choice])
+            master_SII_cat = ascii.read(cat_choice_dir, delimiter=",")
 
         except:
             print("That input wasn't a number, creating a new catalog.")
-            catalog_builder(tel_array=tel_array, cat_name=cat_name)
-            master_SII_cat = ascii.read(cat_name)
+            catalog_builder(tel_array=tel_array, cat_name=cat_name_dir)
+            master_SII_cat = ascii.read(cat_name_dir, delimiter=",")
     else:
-        print("\nNo catalog %s found, creating a new catalog.\n"%(cat_name))
-        catalog_builder(tel_array=tel_array, cat_name=cat_name)
-        master_SII_cat = ascii.read(cat_name)
+        print("\nNo catalog %s found, creating a new catalog.\n"%(cat_name_dir))
+        catalog_builder(tel_array=tel_array, cat_name=cat_name_dir)
+        master_SII_cat = ascii.read(cat_name_dir, delimiter=",")
 
 
 
@@ -721,7 +727,7 @@ if __name__ == "__main__":
 
 
 
-    ascii.write(master_SII_cat, "Ranked_%s"%(cat_name), overwrite=True)
+    ascii.write(master_SII_cat, os.path.join("SIICatalogs", "Ranked_%s"%(cat_name)), overwrite=True, delimiter=",")
 
     response = catalog_interaction(master_SII_cat)
 
