@@ -99,7 +99,7 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     plt.legend(fontsize=28)
     plt.xlabel("Projected Baseline (m)", fontsize=36)
     plt.ylabel("$|V(r)|^2$", fontsize=36)
-
+    plt.xlim([-1, np.max(tr_rad)])
     plt.tick_params(axis='both', which='major', labelsize=28, length=10, width=4)
     plt.tick_params(axis='both', which='minor', labelsize=28, length=10, width=4)
     plt.tick_params(which="major", labelsize=24, length=8, width=3)
@@ -112,10 +112,16 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
         plt.show()
 
 def uvtracks_airydisk2D(tel_tracks, veritas_tels, baselines, airy_func, guess_r, wavelength, save_dir, star_name):
-    x_0 = airy_func.x_0.value
-    y_0 = airy_func.y_0.value
+    x_0 = int(np.max(np.abs(tel_tracks))*1.2)
+    y_0 = int(np.max(np.abs(tel_tracks))*1.2)
+    airy_disk, airy_funcd = IImodels.airy_disk2D(shape=(x_0, y_0),
+                                                 xpos=x_0,
+                                                 ypos=y_0,
+                                                 angdiam=1.22 * wavelength / airy_func.radius.value,
+                                                 wavelength=wavelength)
     y, x = np.mgrid[:x_0 * 2, :y_0 * 2]
-    airy_disk = airy_func(x, y)
+    y, x = np.mgrid[:x_0 * 2, :y_0 * 2]
+    airy_disk = airy_funcd(x, y)
     fig = plt.figure(figsize=(18, 12))
 
     plt.imshow(airy_disk,

@@ -51,7 +51,7 @@ def do_plots(tel_array, baselines, tel_tracks, ang_diam, airy_func, star_err, gu
                               star_name=name,
                               save_dir=star_save)
 
-def star_info(star, wavelength):
+def star_info(star, wavelength, use_queried_mag):
     if star["NAME"]:
         name = str.strip(star["NAME"], " *")
     else:
@@ -59,15 +59,31 @@ def star_info(star, wavelength):
     ra = star["RA"] * u.hourangle
     dec = star["DEC"] * u.deg
 
-    if "SimBMAG" in star.colnames:
-        star_mag = star["SimBMAG"]
+    if "SIM_pmra" in star:
+        pmra = star["SIM_pmra"] * u.arcsec/u.year
+        pmdec = star["SIM_pmdec"] * u.arcsec/u.year
+    elif "BS_pmra" in star:
+        pmra = star["BS_pmra"] * u.arcsec/u.year
+        pmdec = star["BS_pmdec"] * u.arcsec/u.year
     else:
+        pmra = 0 * u.arcsec/u.year
+        pmdec = 0 * u.arcsec/u.year
+
+
+    if use_queried_mag:
         star_mag = star["MAG"]
+    else:
+        if "SimBMAG" in star.colnames:
+            star_mag = star["SimBMAG"]
+        else:
+            star_mag = star["BS_BMAG"]
+
+
 
     ang_diam = (star["ANGD"] * u.mas).to('rad').value
     guess_diam = wavelength / ang_diam
     star_id = str(ra) + str(dec)
-    return name, ra, dec, star_mag, ang_diam, guess_diam, star_id
+    return name, ra, dec, star_mag, ang_diam, guess_diam, star_id, pmra, pmdec
 
 def star_model(tel_array, I_time, star_mag, ang_diam, wavelength, star_id):
     star_err = IItools.track_error(sig0=tel_array.err_sig,
@@ -252,23 +268,27 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
         sim_sptype = simbad_matches["SP_TYPE"]
         sim_bflux = simbad_matches["FLUX_B"]
         sim_id = simbad_matches["MAIN_ID"]
+        sim_rapm = simbad_matches["PMRA"].to('arcsec/yr')
+        sim_decpm = simbad_matches["PMDEC"].to('arcsec/yr')
         data_table = Table([sim_id.astype("U13"), good_ra, good_dec, good_diams, diammean, diamstd, time_ranges,
-                            good_mag_names, good_mags, cat_names, bmag, vmag,
+                            good_mag_names, good_mags, cat_names, bmag, vmag, bs_info["pmRA"], bs_info["pmDE"],
                             bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"], sim_bflux, sim_sptype, simd.to('mas'), sim_rotV,
+                            sim_rapm, sim_decpm,
                             col(amp_errs), col(total_obs_times, unit=u.second), col(Int_obst, unit=u.second)],
                            names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd","ObservableTimes",
-                                  "FILT","MAG","CAT","BS_BMAG","BS_VMAG",
+                                  "FILT","MAG","CAT","BS_BMAG","BS_VMAG", "BS_pmra", "BS_pmdec",
                                   "BSSkyD", "BSSpT", "BSRV","SimBMAG", "SIMSpT", "SIMSkyD", "SIMRV",
+                                  "SIM_pmra", "SIM_pmdec",
                                   "ErrAmp", "TotObsTime", "ObsTime"))
     except Exception as e:
         print(e)
         print("SIMBAD probably failed, using the Bright Star Catalog only")
         data_table = Table([bs_info["Name"], good_ra, good_dec, good_diams, diammean, diamstd, time_ranges,
-                            good_mag_names, good_mags, cat_names, bmag, vmag,
+                            good_mag_names, good_mags, cat_names, bmag, vmag, bs_info["pmRA"], bs_info["pmDE"],
                             bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"],
                             col(amp_errs), col(total_obs_times, unit=u.second), col(Int_obst, unit=u.second)],
                            names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd","ObservableTimes",
-                                  "FILT","MAG","CAT","BS_BMAG","BS_VMAG",
+                                  "FILT","MAG","CAT","BS_BMAG","BS_VMAG","BS_pmra", "BS_pmdec"
                                   "BSSkyD", "BSSpT", "BSRV",
                                   "ErrAmp", "TotObsTime", "ObsTime"))
 
@@ -339,9 +359,9 @@ def catalog_interaction(master_SII_cat):
     cls()
     truncated_print = True
     if "PerFitErr" in master_SII_cat.columns:
-        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT","ObservableTimes", "PerFitErr", "PerFailFit"]
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT","ObservableTimes", "PerFitErr", "PerFailFit"]
     else:
-        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT", "ObservableTimes"]
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT", "ObservableTimes"]
 
 
     master_SII_cat[truncvals].pprint(max_lines=-1,max_width=-1)
@@ -367,7 +387,7 @@ def catalog_interaction(master_SII_cat):
             truncated_print = not truncated_print
             if truncated_print:
                 print("\nTruncated printing is now activated\n")
-                master_SII_cat["Index", "NAME", "RA", "DEC", "ANGD", "BS_BMAG", "BSSpT"].pprint(max_lines=-1, max_width=-1)
+                master_SII_cat["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT"].pprint(max_lines=-1, max_width=-1)
             else:
                 print("\nTruncated printing has been deactivated\n")
                 master_SII_cat.pprint(max_lines=-1, max_width=-1)
@@ -377,13 +397,16 @@ def catalog_interaction(master_SII_cat):
             try:
                 selection = int(mode)
                 star = master_SII_cat[selection]
-                name, ra, dec, star_mag, ang_diam, guess_diam, star_id = star_info(star, wavelength)
+                name, ra, dec, star_mag, ang_diam, guess_diam, star_id, pmra, pmdec = \
+                    star_info(star, wavelength, use_queried_mag)
                 tel_array.star_track(ra=ra,
                                      dec=dec,
                                      alt_cut=alt_cut,
                                      obs_start=obs_start,
                                      obs_end=obs_end,
-                                     Itime=int_time)
+                                     Itime=int_time,
+                                     pmra=pmra,
+                                     pmdec=pmdec)
                 I_time = tel_array.star_dict[star_id]["IntDelt"]
 
                 if I_time:
@@ -455,7 +478,9 @@ if __name__ == "__main__":
         os.makedirs(siicatalogsdir)
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "IIparameters.json"
+        else: param_file_name = "ExampleSIIparameters.json"
+        # else: param_file_name = "IIparameters3.json"
+
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
         with open(param_file_name) as param:
@@ -507,6 +532,8 @@ if __name__ == "__main__":
             sigma_tel = IIparam["sigmaTel"]
             sigma_mag = IIparam["sigmaMag"]
             sigma_time = IIparam["sigmaTime"]
+
+            use_queried_mag = IIparam["useQueriedMag"]
 
             save_plots = IIparam["savePlots"]
 
@@ -601,14 +628,17 @@ if __name__ == "__main__":
     s = timer.time()
     #Start the full ranking
     for star in master_SII_cat:
-        name, ra, dec, star_mag, ang_diam, guess_diam, star_id = star_info(star, wavelength)
+        name, ra, dec, star_mag, ang_diam, guess_diam, star_id, pmra, pmdec = \
+            star_info(star, wavelength, use_queried_mag)
 
         tel_array.star_track(ra=ra,
                              dec=dec,
                              alt_cut=alt_cut,
                              obs_start=obs_start,
                              obs_end=obs_end,
-                             Itime=int_time)
+                             Itime=int_time,
+                             pmra=pmra,
+                             pmdec=pmdec)
 
         I_time = tel_array.star_dict[star_id]["IntDelt"]
 
@@ -668,6 +698,7 @@ if __name__ == "__main__":
 
     e = timer.time()
     total_time = e-s
+    print(total_time)
     fit_diams = np.array(fit_diams)
     fit_errs = np.array(fit_errs)
     failed_fits = np.array(failed_fits)

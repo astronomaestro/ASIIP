@@ -18,5 +18,6 @@
   "sigmaMag": 1.93,
   "sigmaTime": 1800,
   "bootStrapRuns":50,
+  "useQueriedMag":false,
   "savePlots": true
 }

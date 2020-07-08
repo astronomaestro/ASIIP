@@ -89,7 +89,7 @@ class IItelescope():
         self.Bnss.append(Bns)
         self.Buds.append(Bud)
 
-    def star_track(self, ra=None, dec=None, sunangle=-15, alt_cut=20, obs_start=None, obs_end=None, Itime =1800 * u.s):
+    def star_track(self, ra=None, dec=None, sunangle=-15, alt_cut=20, obs_start=None, obs_end=None, Itime =1800 * u.s, pmra=None, pmdec=None):
         """
         This uses astropy to figure out the times available to measure a star throughout the night.
         :param ra: The right ascension of the star you wish to measure in J2000
@@ -102,7 +102,12 @@ class IItelescope():
         :return: Appends the stars calculated informtion to the star dictionary using it's unique RA and DEC
         """
         ra_dec = str(ra) + str(dec)
-        starToTrack = SkyCoord(ra=ra, dec=dec)
+
+        if pmra == None:
+            starToTrack = SkyCoord(ra=ra, dec=dec, frame="icrs", equinox = "J2000")
+        else:
+            # starToTrack = SkyCoord(ra=ra, dec=dec, pm_ra_cosdec=pmra, pm_dec=pmdec, frame="icrs", equinox = "J2000")
+            starToTrack = SkyCoord(ra=ra, dec=dec, frame="icrs", equinox="J2000")
 
 
         starLoc = starToTrack.transform_to(self.telFrame)
@@ -277,7 +282,7 @@ class IItelescope():
         :return: appends results to the object
         """
         from astroquery.vizier import Vizier
-        columns = ['Name','RAJ2000','DEJ2000','Vmag','B-V','U-B', "SpType", "RotVel", "Multiple"]
+        columns = ['Name','RAJ2000','DEJ2000','Vmag','B-V','U-B', "SpType", "RotVel", "Multiple", "pmRA", "pmDE"]
         v = Vizier(columns=columns)
         v.ROW_LIMIT = -1
         result = v.query_constraints(catalog="V/50",
@@ -326,7 +331,7 @@ class IItelescope():
         """
         from astroquery.simbad import Simbad
         Simbad.add_votable_fields('flux(B)', 'flux(G)', 'flux(V)', 'sptype', 'rot', "v*", "velocity", "distance",
-                                  "diameter",
+                                  "diameter", "pm",
                                   "morphtype")
         sim_coords = SkyCoord(ras, decs, unit=(u.hourangle, u.deg))
         sim = Simbad.query_region(sim_coords)
