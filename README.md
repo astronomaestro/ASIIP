@@ -58,16 +58,16 @@ This is a json file which is used to modify the many differing parameters the sc
 analyze. Description of the parameters are given below. If you want to see an example input values, look at the file
 IIparameters.json included with this package.
  
-    - time(YYYY-MM-DD HH:MM:SS): Specifies the desired date of observation. The target planner expects the midnight time of your array in UTC time
+    - time(YYYY-MM-DD HH:MM:SS): Specifies the desired date of observation. The target planner expects the midnight time of your array in UTC time.
     - raRange(hourangle): Specifies the desired RA range query constraints from 0 to 24.
     - decRange(degrees): Specifies the DEC range query constraints from -90 to 90.
-    - magRange: Specifies the Magnitude range query constraints
-    - wavelength(meters): Specifies the wavelength of the filter being used
+    - magRange: Specifies the Magnitude range query constraints.
+    - wavelength(meters): Specifies the wavelength of the filter being used.
     - telLocs(meters): Relative telescope locations of the telescopes you will be using to preform your observation, which will also be used to dynamically calculate the baseline coverage.
-    - integrationTime(hour): The length, in hours, of a single observation interval
-    - telLat(degree): The central latitude of the telescope array
-    - telLon(degree): The central longitude of the telescope array
-    - telElv(meters): The central elevation of the telescope array
+    - integrationTime(hour): The length, in hours, of a single observation interval.
+    - telLat(degree): The central latitude of the telescope array.
+    - telLon(degree): The central longitude of the telescope array.
+    - telElv(meters): The central elevation of the telescope array.
     - altitudeCutoff(degrees): The lowest possible latitude which can be observed by the given observatory. Targets which never rise above this will be excluded.
     - maxSunAltitude(degrees): The altitude the sun must be below before ASIIP will consider a target observable.
     - observationStart(hours): The desired start time of the observation. An input of 0 starts the observation at midnight, -1.5 starts the observation 1.5 hours before midnight, 1.5 starts the observation 1.5 hours after midnight. An input of null starts the observation as early as possible.
@@ -76,6 +76,7 @@ IIparameters.json included with this package.
     - sigmaMag: The magnitude of the star used when empirically determining sigmaTel.
     - sigmaTime(seconds): The integration time used when empirically determining sigmaTel.
     - bootStrapRuns: The amount of Monte Carlo simulations you desire to determine the degeneracy of curve fit. The more bootstrap runs are done, the more accurately the software can rank targets at the cost of computational speed.
+    - useQueriedMag: If this is true, this will tell ASIIP to use the queried MAG in simulations which comes from the original 5 catalogs that are prioritized by age. If this is false, ASIIP will use the SIMBAD B magnitude. If SIMBAD is not available, ASIIP will use the Bright Star Catalog B magnitude.
     - savePlots: If this is true, ASIIP will save produced plots in a directory. If this is false, ASIIP will simply display them on screen. 
     
    
@@ -125,8 +126,10 @@ columns is given below
     - FILT: The optical bandpass filter that was used when querying the catalog.
     - MAG: The visual magnitude associated with the FILT entry used in ASIIP simulations.
     - CAT: The source catalog for RA, DEC, ANGD, FILT, and MAG.
-    - BS\_BMAG: The cross matched Bright Star catalog B magnitude.
-    - BS\_VMAG: The cross matched Bright Star catalog V magnitude.
+    - BS_BMAG: The cross matched Bright Star catalog B magnitude.
+    - BS_VMAG: The cross matched Bright Star catalog V magnitude.
+    - BS_pmra(arcsec/year): Bright Star Catalog target RA proper motion.
+    - BS_pmdec(arcsec/year): Bright Star Catalog target DEC proper motion.
     - BSSkyD: The difference between the input RA and DEC vs the the cross matched Bright Star catalog RA and DEC in mas. If BSSkyD is not 0 it means that the RA and DEC don't match precisely. If this is large, it could indicate a mismatched entry.
     - BSSpT: The spectral type of the cross matched target as given by the Bright Star Catalog.
     - ObservableTimes(hour): The range of times a target can be observed within the given observational constraints. A time of 0 is midnight, a time of -1 is an hour before midnight, a time of 1 would is an hour after midnight.
@@ -135,6 +138,8 @@ columns is given below
     - SIMSpT: The spectral type of the cross matched target as given by SIMBAD.
     - SIMSkyD(mas): The difference between the input RA and DEC vs the cross matched SIMBAD RA and DEC. If SIMSkyD is not 0 it means that the RA and DEC don't match precisely. If this is large, it could indicate a mismatched entry.
     - SIMRV(km/s): The radial velocity of the cross matched target as given by SIMBAD.
+    - SIM_pmra(arcsec/year): SIMBAD target RA proper motion.
+    - SIM_pmdec(arcsec/year): SIMBAD target DEC proper motion.
     - ErrAmp: The calculated error for the given integration time and magnitude.
     - TotObsTime(s): The total available observation time.
     - ObsTime(s): The integrated observation time used in the analysis in seconds used in ASIIP simulations.

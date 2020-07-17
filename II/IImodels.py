@@ -28,7 +28,8 @@ def airy_disk2D(shape, xpos, ypos, angdiam, wavelength):
     from astropy.modeling.functional_models import AiryDisk2D
     from astropy.modeling import fitting
 
-    r = 1.22 * wavelength / angdiam
+    con = jn_zeros(1, 1)[0] / np.pi
+    r = con * wavelength / angdiam
 
     y, x = np.mgrid[:shape[0], :shape[1]]
     # Fit the data using astropy.modeling
