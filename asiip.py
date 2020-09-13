@@ -81,7 +81,7 @@ def star_info(star, wavelength, use_queried_mag):
 
 
     ang_diam = (star["ANGD"] * u.mas).to('rad').value
-    guess_diam = wavelength / ang_diam
+    guess_diam = 1.22 * wavelength / ang_diam
     star_id = str(ra) + str(dec)
     return name, ra, dec, star_mag, ang_diam, guess_diam, star_id, pmra, pmdec
 
@@ -478,8 +478,8 @@ if __name__ == "__main__":
         os.makedirs(siicatalogsdir)
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "ExampleSIIparameters.json"
-        # else: param_file_name = "IIparameters3.json"
+        # else: param_file_name = "ExampleSIIparameters.json"
+        else: param_file_name = "IIparameters2.json"
 
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
@@ -662,6 +662,7 @@ if __name__ == "__main__":
                            wavelength=wavelength, star_id=star_id)
             #This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
             #can use this function as a template to create another analysis technique
+            # print(star)
             fdiams, ferrs, ffit = \
                 IItools.IIbootstrap_analysis_airyDisk(tel_tracks=tel_tracks,
                                                       airy_func=airy_func,
@@ -671,7 +672,7 @@ if __name__ == "__main__":
                                                       runs=boot_runs)
             guess_diam = wavelength / ang_diam
 
-            fit_diams.append(wavelength/fdiams * u.rad.to('mas'))
+            fit_diams.append(1.22*wavelength/fdiams * u.rad.to('mas'))
             fit_errs.append(ferrs)
             failed_fits.append(ffit/boot_runs*100)
             guess_diams.append(star["ANGD"])

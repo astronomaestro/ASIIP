@@ -46,13 +46,21 @@ def airy1D(xr, r):
     """
     con = jn_zeros(1,1)[0]/np.pi
     # con = 1
-    airy_mod = (2*j1(con*np.pi*xr/r) / (np.pi * xr * con/r))**2
+    bessel_1 = 2*j1(con * np.pi * xr / r)
+    bessle_norm = (np.pi * xr * con / r)
+
+    if np.any(xr == 0):
+        both_zero = np.where((bessel_1 == 0) & (bessle_norm == 0))
+        bessel_1[both_zero] = 1
+        bessle_norm[both_zero] = 1
+    airy_mod = (bessel_1 / bessle_norm) ** 2
+
     return airy_mod
 
 def visibility2dTo1d(tel_tracks, visibility_func, x_0, y_0):
     """
     Take the tracks generated from a 2D airy disk curve and convert them into a 1D airy disk curve
-    :param x_0: The x coordinate 0 point of the visibility model
+    :param x_0: The x cfoordinate 0 point of the visibility model
     :param y_0: The y coordinate 0 point of the visibility model
     :param tel_tracks: The tracks from the 2D airy disk
     :param visibility_func: The 2D visibility function used to generate the tracks
