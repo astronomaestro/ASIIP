@@ -288,7 +288,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
                             bs_dis.to("mas"), bs_info["SpType"], bs_info["RotVel"],
                             col(amp_errs), col(total_obs_times, unit=u.second), col(Int_obst, unit=u.second)],
                            names=("NAME","RA","DEC","ANGD","DiamMedian","DiamStd","ObservableTimes",
-                                  "FILT","MAG","CAT","BS_BMAG","BS_VMAG","BS_pmra", "BS_pmdec"
+                                  "FILT","MAG","CAT","BS_BMAG","BS_VMAG","BS_pmra", "BS_pmdec",
                                   "BSSkyD", "BSSpT", "BSRV",
                                   "ErrAmp", "TotObsTime", "ObsTime"))
 
@@ -478,8 +478,8 @@ if __name__ == "__main__":
         os.makedirs(siicatalogsdir)
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        # else: param_file_name = "ExampleSIIparameters.json"
-        else: param_file_name = "IIparameters2.json"
+        else: param_file_name = "ExampleSIIparameters.json"
+        # else: param_file_name = "IIparameters2.json"
 
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
