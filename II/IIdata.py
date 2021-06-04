@@ -8,6 +8,8 @@ import os
 from astroquery.vizier import Vizier
 from II import IItools
 from astropy.coordinates import get_sun
+from astropy.coordinates import get_moon
+
 
 from astropy.utils import iers
 
@@ -48,6 +50,7 @@ class IItelescope():
 
         #get indicies for when sky is dark
         self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
+        self.moonaltazs = get_moon(self.delta_time+self.time_info).transform_to(self.telFrame)
         dark_times = np.where((self.sunaltazs.alt < max_sun_alt * u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
         self.max_sun_alt = max_sun_alt
@@ -135,6 +138,10 @@ class IItelescope():
             self.star_dict[ra_dec]["DEC"] = dec
             self.star_dict[ra_dec]["ObsTimes"] = observable_times
             # self.star_dict[ra_dec]["SideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][ftime_range] - starToTrack.ra
+
+            self.star_dict[ra_dec]["fullAlt"] = starLoc.alt
+            self.star_dict[ra_dec]["fullAz"] = starLoc.az
+
 
             self.star_dict[ra_dec]["Alt"] = starLoc.alt[sky_ind]
             self.star_dict[ra_dec]["Airmass"] = starLoc.secz[sky_ind]

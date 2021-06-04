@@ -2,9 +2,35 @@ import matplotlib.pyplot as plt
 import astropy.units as u
 import astropy.visualization as viz
 from astropy.coordinates import Angle
+from astropy.coordinates import SkyCoord
 from II import IItools, IImodels
 import numpy as np
 import os
+
+
+def target_moon_location(tel_array, star_id, name, save_dir):
+
+    moon_loc = tel_array.moonaltazs
+    star_info = tel_array.star_dict[star_id]
+
+
+    moon_loc = SkyCoord(moon_loc.az, moon_loc.alt)
+    star_loc = SkyCoord(star_info['fullAz'], star_info['fullAlt'])
+    moon_star_separation = moon_loc.separation(star_loc)
+
+    plt.figure(figsize=(16,16))
+    plt.title("%s on %s"%(name, tel_array.time_info), fontsize=32)
+    plt.xlabel("Hours from Midnight (hours)", fontsize=28)
+    plt.ylabel("Sky distance from Moon for %s (degrees)"%(name), fontsize=28)
+    plt.tick_params(axis='both', which='major', labelsize=20)
+    plt.tick_params(axis='both', which='minor', labelsize=18)
+    plt.plot(tel_array.delta_time, moon_star_separation, linewidth=6)
+
+
+    if save_dir:
+        graph_saver(save_dir, "MoonStarDistance")
+    else:
+        plt.show()
 
 def display_airy_disk(veritas_array, angd, wavelength, save_dir):
     airy_disk, airy_func = IImodels.airy_disk2D(shape=(veritas_array.xlen, veritas_array.ylen),

@@ -22,7 +22,13 @@ red_line = '\n\x1b[1;31;40m' + sep_line + '\x1b[0m\n'
 def cls():
     os.system('cls' if os.name=='nt' else 'clear')
 
-def do_plots(tel_array, baselines, tel_tracks, ang_diam, airy_func, star_err, guess_r, wavelength, name, I_time, pererr, star_save):
+def do_plots(tel_array, baselines, tel_tracks, ang_diam, airy_func, star_err, guess_r, wavelength, name, I_time, pererr,
+             star_save, star_id):
+    IIdisplay.target_moon_location(tel_array=tel_array,
+                                   star_id=star_id,
+                                   name=name,
+                                   save_dir=star_save)
+
     IIdisplay.uvtrack_model_run(tel_tracks=tel_tracks,
                                 airy_func=airy_func,
                                 star_err=star_err,
@@ -444,18 +450,9 @@ def catalog_interaction(master_SII_cat):
 
                     guess_r = airy_func.radius.value
 
-                    do_plots(tel_array=tel_array,
-                             baselines=baselines,
-                             tel_tracks=tel_tracks,
-                             ang_diam=star["ANGD"],
-                             airy_func=airy_func,
-                             star_err=star_err,
-                             guess_r=guess_r,
-                             wavelength=wavelength,
-                             name=name,
-                             I_time=I_time,
-                             pererr=fit_err,
-                             star_save=star_save)
+                    do_plots(tel_array=tel_array, baselines=baselines, tel_tracks=tel_tracks, ang_diam=star["ANGD"],
+                             airy_func=airy_func, star_err=star_err, guess_r=guess_r, wavelength=wavelength, name=name,
+                             I_time=I_time, pererr=fit_err, star_save=star_save, star_id=star_id)
 
 
                 else:
