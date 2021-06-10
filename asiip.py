@@ -146,6 +146,7 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
     dup_count = []
     time_ranges = []
     coords_done = None
+    first_cord = False
     for catalog, cat_name in zip(tel_array.catalogs, tel_array.cat_names):
         ras, decs, ang_diams, mags, mag_name = tel_array.ra_dec_diam_getter(cat_name, catalog)
         pos_cat=SkyCoord(ras,decs)
@@ -153,9 +154,10 @@ def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
 
 
         if len(pos_cat) ==0:continue
-        if coords_done == None:
+        if not first_cord:
             closest_star, skydis, distance3d = (np.array([]), Angle(np.ones(len(ras)),unit=u.rad), np.full(len(ras),True))
             coords_done = SkyCoord(good_ra, good_dec, unit=("hourangle", "deg"))
+            first_cord = True
 
         else:
             coords_done = SkyCoord(good_ra, good_dec, unit=("hourangle","deg"))
