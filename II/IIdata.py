@@ -19,7 +19,9 @@ iers.conf.auto_download = True
 
 class IItelescope():
     def __init__(self, telLat, telLon, telElv, time, steps, sig1=.11, m1=1.7, t1=800, xlen=500, ylen=500,
-                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0), max_sun_alt = -15, timestep=.5):
+                 mag_range=(-3, 3), dec_range=(-20, 90), ra_range=(0,0), max_sun_alt = -15, timestep=.5,
+                 tel_areas=[1,1,1,1], tel_quant = [.2,.2,.2,.2], tel_consts = [.7,.7,.7,.7], n0=5e-5,back_ratio=0.00001,
+                 kappa=1, elec_bandwidth=1e8,opt_bandwidth = 5e-9):
 
         self.Bews = []
         self.Bnss = []
@@ -39,6 +41,15 @@ class IItelescope():
         self.err_mag = m1
         self.err_t1 = t1
 
+        self.tel_areas = tel_areas
+        self.tel_quant_effs = tel_quant
+        self.tel_consts = tel_consts
+        self.n0 = n0
+        self.back_ratio = back_ratio
+        self.kappa = kappa
+        self.elec_bandwidth = elec_bandwidth
+        self.optical_bandwidth = opt_bandwidth
+        self.tel_names = []
         self.time_info = None
 
         self.time_info = Time(time, location=self.tel_loc)
@@ -128,7 +139,8 @@ class IItelescope():
         if not obs_start: obs_start = mintime
         if not obs_end: obs_end = maxtime
 
-        ftime_range = np.where((observable_times >= obs_start-Itime) & (observable_times <= obs_end+Itime))
+        # ftime_range = np.where((observable_times >= obs_start-Itime) & (observable_times <= obs_end+Itime))
+        # ftime_range = np.where((observable_times >= obs_start) & (observable_times <= obs_end))
 
 
 
@@ -154,19 +166,19 @@ class IItelescope():
             int_starLoc = starToTrack.transform_to(self.intTelFrame)
             int_sky_ind = np.where((self.intsunaltazs.alt <= sunangle * u.deg) & (int_starLoc.alt >= alt_cut * u.deg))[0]
             int_observable_times = self.int_delta_time[int_sky_ind]
-            time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start-Itime) & (self.int_delta_time[int_sky_ind] <= obs_end+Itime))
+            time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start) & (self.int_delta_time[int_sky_ind] <= obs_end))
 
-            if len(ftime_range[0]) > 2:
-                self.star_dict[ra_dec]["fIntTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
-                                                          ftime_range] - starToTrack.ra
-                self.star_dict[ra_dec]["fIntDelt"] = self.star_dict[ra_dec]["fIntTimes"][1] - \
-                                                     self.star_dict[ra_dec]["fIntTimes"][0]
-                self.star_dict[ra_dec]["fIntSideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
-                                                              ftime_range] - starToTrack.ra
-            else:
-
-                self.star_dict[ra_dec]["fIntTimes"] = None
-                self.star_dict[ra_dec]["fIntDelt"] = None
+            # if len(ftime_range[0]) > 2:
+            #     self.star_dict[ra_dec]["fIntTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
+            #                                               ftime_range] - starToTrack.ra
+            # #     self.star_dict[ra_dec]["fIntDelt"] = self.star_dict[ra_dec]["fIntTimes"][1] - \
+            # #                                          self.star_dict[ra_dec]["fIntTimes"][0]
+            # #     self.star_dict[ra_dec]["fIntSideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
+            # #                                                   ftime_range] - starToTrack.ra
+            # # else:
+            # #
+            # #     self.star_dict[ra_dec]["fIntTimes"] = None
+            # #     self.star_dict[ra_dec]["fIntDelt"] = None
 
             if len(time_range[0]) > 1:
                 self.star_dict[ra_dec]["IntTimes"] = self.int_delta_time[int_sky_ind][time_range]

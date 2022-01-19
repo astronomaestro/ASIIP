@@ -109,7 +109,7 @@ def fit_airy_avg(rads, avg_rads, avg_amps, err, guess_r):
         mod_Int = np.array([IItools.trapezoidal_average(airy1D(rad, r)) for rad in rads])
         return mod_Int.ravel()
 
-    sigmas = np.full(len(avg_amps.ravel()), err)
+    sigmas = np.full(avg_amps.shape, np.array([err]).T).ravel()
     smartFit, serr = curve_fit(f=airy_avg,
                                xdata=avg_rads.ravel(),
                                ydata=avg_amps.ravel(),

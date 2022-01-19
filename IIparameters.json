@@ -18,5 +18,8 @@
   "sigmaMag": 1.7,
   "sigmaTime": 1800,
   "bootStrapRuns":50,
-  "savePlots": false
+  "useQueriedMag":false,
+  "savePlots": false,
+  "telAreasQuantConEff": [[113.1,113.1,113.1,113.1],[0.25,0.25,0.25,0.25],[0.1725,0.1725,0.1725,0.025]],
+  "elecOptBandBetKapn0": [1e8,5e-9,0.0,1,5e-5]
 }

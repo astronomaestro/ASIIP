@@ -35,7 +35,7 @@ tel_array = IIdata.IItelescope(telLat=IIparam['telLat'],
                                timestep=IIparam['integrationTime'])
 
 relative_tel_locs = np.array(IIparam["telLocs"])
-baselines = IItools.array_baselines(relative_tel_locs)
+baselines, tel_names = IItools.array_baselines(relative_tel_locs)
 [tel_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
 
 ang_diam = (.5 * u.mas).to('rad').value

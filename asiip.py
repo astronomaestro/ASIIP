@@ -38,6 +38,7 @@ def do_plots(tel_array, baselines, tel_tracks, ang_diam, airy_func, star_err, gu
                                 ITime=I_time,
                                 save_dir=star_save,
                                 pererr=pererr,
+                                tel_names=tel_array.tel_names,
                                 fullAiry=True)
 
     IIdisplay.uvtracks_airydisk2D(tel_tracks=tel_tracks,
@@ -97,6 +98,16 @@ def star_model(tel_array, I_time, star_mag, ang_diam, wavelength, star_id):
                                    m=star_mag,
                                    T_0=tel_array.err_t1,
                                    T=I_time.to("s").value)
+    tel_star_errs, sig, noise = IItools.tel_pair_error(tel_areas=tel_array.tel_areas,
+                                   tel_quant=tel_array.tel_quant_effs,
+                                   tel_consts=tel_array.tel_consts,
+                                   n0=tel_array.n0,
+                                   B=tel_array.back_ratio,
+                                   k=tel_array.kappa,
+                                   electronic_bandwidth=tel_array.elec_bandwidth,
+                                   opt_bandwidth=tel_array.optical_bandwidth,
+                                   m=star_mag,
+                                   T=I_time.to("s").value)
 
     hour_angle_rad = Angle(tel_array.star_dict[star_id]["IntSideTimes"]).to('rad').value
     dec_angle_rad = tel_array.star_dict[star_id]["DEC"].to('rad').value
@@ -115,7 +126,7 @@ def star_model(tel_array, I_time, star_mag, ang_diam, wavelength, star_id):
                                                 ypos=tel_array.ylen,
                                                 angdiam=ang_diam,
                                                 wavelength=wavelength)
-    return star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func
+    return np.array(tel_star_errs), hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func
 
 def siicat_constructor(tel_array, cutoff_obs_time=0, Int_obst=None):
     """
@@ -424,6 +435,7 @@ def catalog_interaction(master_SII_cat):
                     # This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
                     # can use this function as a template to create another analysis technique
                     runs = boot_runs * 2
+
                     fdiams, ferrs, ffit = \
                         IItools.IIbootstrap_analysis_airyDisk(tel_tracks=tel_tracks,
                                                               airy_func=airy_func,
@@ -477,8 +489,8 @@ if __name__ == "__main__":
         os.makedirs(siicatalogsdir)
     try:
         if len(sys.argv) > 1: param_file_name = sys.argv[1]
-        else: param_file_name = "ExampleSIIparameters.json"
-        # else: param_file_name = "IIparameters2.json"
+        # else: param_file_name = "ExampleSIIparameters.json"
+        else: param_file_name = "IIparameters2.json"
 
 
         #Read in all parameters from the parameter file to make sure everything will run correctly
@@ -536,6 +548,9 @@ if __name__ == "__main__":
 
             save_plots = IIparam["savePlots"]
 
+            tel_areas, quantum_effs, tel_const = IIparam["telAreasQuantConEff"]
+            electronic_band, optical_band, beta_background, kappa, n0 = IIparam["elecOptBandBetKapn0"]
+
             #this is the name of the output save file
 
             if os.name == "nt":
@@ -575,9 +590,30 @@ if __name__ == "__main__":
                                    dec_range=dec_range,
                                    ra_range=ra_range,
                                    max_sun_alt=max_sun_alt,
-                                   timestep=int_time.value)
+                                   timestep=int_time.value,
+                                   tel_areas=tel_areas,
+                                   tel_quant=quantum_effs,
+                                   tel_consts=tel_const,
+                                   n0=n0,
+                                   back_ratio=beta_background,
+                                   kappa=kappa,
+                                   elec_bandwidth=electronic_band,
+                                   opt_bandwidth=optical_band
+                                   )
 
-    baselines = IItools.array_baselines(relative_tel_locs)
+    baselines, tel_names = IItools.array_baselines(relative_tel_locs)
+    tel_array.tel_names = tel_names
+    tel_errs, signals, noises = IItools.tel_pair_error(tel_areas=tel_array.tel_areas,
+                                   tel_quant=tel_array.tel_quant_effs,
+                                   tel_consts=tel_array.tel_consts,
+                                   n0=tel_array.n0,
+                                   B=tel_array.back_ratio,
+                                   k=tel_array.kappa,
+                                   electronic_bandwidth=tel_array.elec_bandwidth,
+                                   opt_bandwidth=tel_array.optical_bandwidth,
+                                   m=1.93,
+                                   T=1800)
+
     [tel_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
 
 

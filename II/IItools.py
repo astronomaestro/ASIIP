@@ -79,11 +79,34 @@ def array_baselines(tel_locs):
     n = len(tel_locs)
     N = n*(n-1)/2
     baselines = []
-
+    tel_names = []
     for i in range(n):
         for j in range(1,n-i):
             baselines.append(tel_locs[i] - tel_locs[i+j])
-    return baselines
+            tel_names.append("T%sT%s"%(i+1,i+j + 1))
+    return baselines, tel_names
+
+def tel_pair_error(tel_areas, tel_quant, tel_consts, electronic_bandwidth, opt_bandwidth, B, k, m, n0, T):
+    spec_dens = n0 * 2.5 ** (-m)
+    # S0S1 = areaT0 * areaT1 * quant_eff0 * quant_eff1 * spec_dens ** 2 * gamma2 * electronic_bandwidth * opt_bandwidth * c0 * c1
+    # N0N1 = np.sqrt(2 * areaT0 * areaT1 * quant_eff0 * quant_eff1 * electronic_bandwidth / T) * spec_dens * np.sqrt(c0 * c1) * opt_bandwidth
+    gamma2 = (1 + B) ** 2 / k ** 2
+    photon_collection_con = np.array([ta*qu*tc for ta,qu,tc in zip(tel_areas, tel_quant, tel_consts)])
+    n = len(photon_collection_con)
+    tel_errs = []
+    signals = []
+    noises = []
+    for i in range(n):
+        for j in range(1,n-i):
+            # area_combo = tel_area[i]*tel_area[i+j] * spec_dens**2 * gamma2 * electronic_bandwidth * opt_band
+            tel_cons_combo = photon_collection_con[i] * photon_collection_con[i + j]
+            signal = tel_cons_combo * spec_dens**2 * gamma2 * electronic_bandwidth * opt_bandwidth
+            noise = np.sqrt(2 * tel_cons_combo * electronic_bandwidth / T) * spec_dens * opt_bandwidth
+            noisedivsig = noise/signal
+            tel_errs.append(noisedivsig)
+            signals.append(signal)
+            noises.append(noise)
+    return tel_errs, signals, noises
 
 
 
@@ -251,8 +274,9 @@ def IIbootstrap_analysis_airyDisk(tel_tracks, airy_func, star_err, guess_diam, w
             #If you wish to add different analytical models, simply write a function that replaces fit_airy_avg below
             #Be sure to understand the data structures produced by airy2dTo1d and to include the new model in a different
             #function to allow for readability
+            simulated_errs = np.array([telamp + np.random.normal(0, serr, telamp.shape) for serr, telamp in zip(star_err, avgamp)])
             airy_fitr, airy_fiterr, sigmas = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad,
-                                                                   avg_amps=avgamp + np.random.normal(0, star_err,avgamp.shape),
+                                                                   avg_amps=avgamp + simulated_errs,
                                                                    err=star_err,
                                                                    guess_r=guess_diam + np.random.normal(0,guess_diam / 5))
 
@@ -294,7 +318,8 @@ def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
     from scipy.stats import chisquare
     rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
                                                            x_0=airy_func.x_0.value, y_0=airy_func.y_0.value)
-    yerr = np.random.normal(0, star_err, avgamp.shape)
+    point_err = np.full(avgamp.shape, np.array([star_err]).T)
+    yerr = np.random.normal(0, point_err, avgamp.shape)
     rerr = np.random.normal(0, guess_r / 5)
     airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,
                                                         err=star_err, guess_r=guess_r + rerr)
@@ -307,7 +332,6 @@ def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
     fit_vals = np.linspace(min_bound*guess_r, max_bound*guess_r, num=300)
 
     xvals = np.linspace(0, guess_r * 2)
-    chis = []
 
     def airy_avg(xr, r):
         mod_Int = np.array([trapezoidal_average(IImodels.airy1D(rad, r)) for rad in rads])
@@ -315,11 +339,12 @@ def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
 
     # plt.plot(avgrad.ravel(), airy_avg(rads, guess_r), 'o')
 
-    perfect_dat = airy_avg(rads, guess_r)
 
     perfect_dat = airy_avg(rads, guess_r)
+    rav_err = point_err.ravel()
+    chis = []
     for val in fit_vals:
-        new_chi = chisq(airy_avg(rads, val), perfect_dat, star_err)
+        new_chi = chisq(airy_avg(rads, val), perfect_dat, rav_err)
         chis.append(new_chi)
 
     plot_vals = np.linspace(ang_diam * mincon, ang_diam * maxcon, num=300)

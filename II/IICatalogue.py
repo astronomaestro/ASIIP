@@ -16,7 +16,7 @@ T4_mcgill=np.array([-35.9,11.3,7.0])
 
 veritas_locs = [T1_mcgill, T2_mcgill, T3_mcgill, T4_mcgill]
 
-baselines = IItools.array_baselines(veritas_locs)
+baselines, tel_names = IItools.array_baselines(veritas_locs)
 
 veritas_telLat = 31.6749557
 veritas_telLon = -110.9507624

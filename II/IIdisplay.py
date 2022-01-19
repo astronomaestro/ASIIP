@@ -80,11 +80,12 @@ def chi_square_anal(tel_tracks, airy_func, star_err, guess_r, ang_diam, star_nam
     else:
         plt.show()
 
-def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, pererr,
+def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star_name, ITime, save_dir, pererr, tel_names,
                       fullAiry=False):
     rads, amps, avgrad, avgamp = IImodels.visibility2dTo1d(tel_tracks=tel_tracks, visibility_func=airy_func,
                                                            x_0=airy_func.x_0.value, y_0=airy_func.y_0.value)
-    yerr = np.random.normal(0, star_err, avgamp.shape)
+    point_err = np.full(avgamp.shape, np.array([star_err]).T)
+    yerr = np.random.normal(0, point_err, avgamp.shape)
     rerr = np.random.normal(0, guess_r / 5)
     airy_fitr, airy_fiterr, sig = IImodels.fit_airy_avg(rads=rads, avg_rads=avgrad, avg_amps=avgamp + yerr,
                                                         err=star_err, guess_r=guess_r + rerr)
@@ -96,13 +97,15 @@ def uvtrack_model_run(tel_tracks, airy_func, star_err, guess_r, wavelength, star
     tr_amp = amps.ravel()
     rs = np.argsort(tr_rad)
     plt.figure(figsize=(18, 12))
-    plt.errorbar(x=tr_Irad,
-                 y=tr_Ints + yerr.ravel(),
-                 fmt='o',
-                 yerr=np.full(len(tr_Ints), star_err),
-                 label="Simulated Data",
-                 linewidth=2,
-                 markersize=10)
+    for i,tel in enumerate(tel_names):
+
+        plt.errorbar(x=avgrad[i],
+                     y=avgamp[i] + yerr[i],
+                     fmt='o',
+                     yerr=point_err[i],
+                     label="%s err %.5f" % (tel,star_err[i]),
+                     linewidth=2,
+                     markersize=10)
     # plt.scatter(tr_Irad, tr_Ints, label="Actual Integration", s=120, color="r")
     #
     # plt.plot(tr_rad[rs], IImodels.airy1D(tr_rad, airy_fitr)[rs], linestyle="--", label="Fitted Airy Function",
