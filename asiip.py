@@ -359,7 +359,7 @@ def catalog_builder(tel_array, cat_name="MasterSIICatalog"):
     #Save the completed master SII catalog
     ind_col = col(np.arange(len(masterSII_cat)), name="Index")
     masterSII_cat.add_column(ind_col, index=0)
-    ascii.write(masterSII_cat, cat_name, delimiter=',')
+    ascii.write(masterSII_cat, cat_name, delimiter=',', overwrite=True)
     absdf=123
 
 def catalog_interaction(master_SII_cat):
@@ -367,7 +367,7 @@ def catalog_interaction(master_SII_cat):
     cls()
     truncated_print = True
     if "PerFitErr" in master_SII_cat.columns:
-        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT","ObservableTimes", "PerFitErr", "PerFailFit"]
+        truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT","ObservableTimes", "MoonSeparation", "PerFitErr", "PerFailFit"]
     else:
         truncvals = ["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT", "ObservableTimes"]
 
@@ -395,7 +395,7 @@ def catalog_interaction(master_SII_cat):
             truncated_print = not truncated_print
             if truncated_print:
                 print("\nTruncated printing is now activated\n")
-                master_SII_cat["Index", "NAME", "RA", "DEC", "ANGD", "MAG", "BS_BMAG", "BSSpT"].pprint(max_lines=-1, max_width=-1)
+                master_SII_cat[truncvals].pprint(max_lines=-1, max_width=-1)
             else:
                 print("\nTruncated printing has been deactivated\n")
                 master_SII_cat.pprint(max_lines=-1, max_width=-1)
@@ -624,6 +624,7 @@ if __name__ == "__main__":
     star_tracks = []
     star_funcs = []
     star_errs = []
+    star_moon_separations = []
     s = timer.time()
     #Start the full ranking
     for star in master_SII_cat:
@@ -659,6 +660,7 @@ if __name__ == "__main__":
             star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func = \
                 star_model(tel_array=tel_array, I_time=I_time, star_mag=star_mag, ang_diam=ang_diam,
                            wavelength=wavelength, star_id=star_id)
+            star_moon_separation = tel_array.star_dict[star_id]["moonSeparation"]
             #This is where the custom Monte Carlo analysis is performed. If you wish to add an analytical function, you
             #can use this function as a template to create another analysis technique
             # print(star)
@@ -678,7 +680,7 @@ if __name__ == "__main__":
             star_tracks.append(tel_tracks)
             star_funcs.append(airy_func)
             star_errs.append(star_err)
-
+            star_moon_separations.append(star_moon_separation[0].value)
             print("Completed %s" % (name))
             abs=2323
         else:
@@ -694,6 +696,7 @@ if __name__ == "__main__":
             star_tracks.append(np.nan)
             star_funcs.append(np.nan)
             star_errs.append(np.nan)
+            star_moon_separations.append(np.nan)
 
 
     e = timer.time()
@@ -713,6 +716,7 @@ if __name__ == "__main__":
     err_of_diam_err = stdFits/medianFits*100
 
     if "MeanDiamFit" not in master_SII_cat.colnames:
+        master_SII_cat.add_column(col(np.array(star_moon_separations), name="MoonSeparation", format="%.2f"))
         master_SII_cat.add_column(col(medianFits, name="MeanDiamFit", format="%.2f"))
         master_SII_cat.add_column(col(diam_percent_err, name="PerDiamErr", format="%.2f"))
         master_SII_cat.add_column(col(err_of_diam_err, name="PerFitErr", format="%.2f"))

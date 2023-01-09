@@ -130,7 +130,12 @@ class IItelescope():
 
         ftime_range = np.where((observable_times >= obs_start-Itime) & (observable_times <= obs_end+Itime))
 
+        moon_loc = self.moonaltazs
 
+        moon_sky_loc = SkyCoord(moon_loc.az, moon_loc.alt)
+        star_sky_location = SkyCoord(starLoc.az,
+                                     starLoc.alt)
+        moon_star_separation = moon_sky_loc.separation(star_sky_location)
 
         if ra_dec not in self.star_dict:
             self.star_dict[ra_dec] = {}
@@ -147,7 +152,7 @@ class IItelescope():
             self.star_dict[ra_dec]["Airmass"] = starLoc.secz[sky_ind]
             self.observable_times = observable_times
             self.star_dict[ra_dec]["totTime"] = (self.time_delt * len(observable_times)).to('s')
-
+            self.star_dict[ra_dec]["moonSeparation"] = moon_star_separation[sky_ind]
 
         # time_overlap = IItools.getIntersection([obs_start.to('h').value, obs_end.to('h').value],
         #                                        [mintime.to('h').value,maxtime.to('h').value])
