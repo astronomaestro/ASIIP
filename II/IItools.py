@@ -7,10 +7,18 @@ import astropy.units as u
 from astropy.time import Time
 from II import IImodels
 from astroquery.vizier import Vizier
+import numba
+from scipy.optimize import curve_fit
 
+# @numba.jit(parallel=True)
+def datcompress(A,chunk, chunkavail):
+    return np.array([(A[ii * chunk:(ii + 1) * chunk]).mean(axis=0) for ii in range(chunkavail)])
 
-
-
+# @numba.jit(parallel=True)
+# def datcompress(A,timmeans,chunk, chunkavail):
+#     for ii in range(chunkavail):
+#         timmeans[ii] = A[ii * chunk:(ii + 1) * chunk].mean()
+#     return timmeans
 def radial_profile(data, center=None):
     """
     Calculate a circular 1D radial profile given a 2D array
@@ -79,11 +87,12 @@ def array_baselines(tel_locs):
     n = len(tel_locs)
     N = n*(n-1)/2
     baselines = []
-
+    tel_names = []
     for i in range(n):
         for j in range(1,n-i):
             baselines.append(tel_locs[i] - tel_locs[i+j])
-    return baselines
+            tel_names.append("T%sT%s"%(i+0,i+j + 0))
+    return baselines, tel_names
 
 
 
@@ -327,4 +336,158 @@ def chi_square_anal(airy_func, tel_tracks, guess_r, star_err, ang_diam):
     # plt.plot(plot_vals, chis)
     return plot_vals[::-1],chis
 
+def amp_anal(data, odp_corr, baseline, start, end, order=3, g2width=0.9):
 
+    cut_opd_correction = odp_corr - start
+    cutdata = data[:, start:end]
+    g2shape = cutdata.shape
+
+    def g2_sig_amp_ravel(x, *args):
+        polyterms = [term for term in args]
+        g2amp_poly = np.poly1d(polyterms)
+        g2amp_model = g2amp_poly(x)
+        ravelg2 = g2_sig_surface(g2width, g2amp_model, cut_opd_correction, g2shape).ravel()
+        return ravelg2
+
+    time = np.arange(cutdata.shape[0])
+
+    guess_par = np.zeros(order)
+    g2fitpar, g2fiterr = curve_fit(f=g2_sig_amp_ravel,
+                                   xdata=baseline,
+                                   ydata=cutdata.ravel(),
+                                   p0=guess_par)
+    amps = np.poly1d(g2fitpar)(baseline)
+    return amps, cut_opd_correction, cutdata, g2fitpar
+def opd_correction_new(data, opd, baseline, tcors, datstart=40, datend=90, order=4, highorder=4, g2width=0.9):
+    steps = len(tcors)
+    amp_means = np.zeros(steps)
+    opdstart_tcor = np.zeros(len(tcors))
+    for i in range(steps):
+        opdcorrected = opd + tcors[i]
+        amps, cut_opd_correction, cutdata , polypars = amp_anal(data, opdcorrected, baseline, datstart, datend, order=order, g2width=g2width)
+        amp_means[i] = amps.mean()
+        opdstart_tcor[i] = opdcorrected[0]
+    peak_arg = np.argmax(amp_means)
+
+    tcorr = opdstart_tcor[peak_arg]
+    bestfitamp, _, _, polypars = amp_anal(data, opd + tcorr, baseline, datstart, datend, order=order)
+    bestfitamp_highpoly, _, _, polypars_high = amp_anal(data, opd + tcorr, baseline, datstart, datend,
+                                                        order=highorder)
+    tshift = tcorr - opd[0]
+
+
+    return amp_means, tshift, opdstart_tcor, bestfitamp,bestfitamp_highpoly
+@numba.jit()
+def gaussian(x, mu, sig, amp):
+    return amp * np.exp(-0.5 * (x-mu)**2 / sig**2)
+
+fgx = np.linspace(-64,64,128)
+@numba.jit()
+def gaussian_msub(x, mu, sig, amp):
+    gausmod = amp * np.exp(-0.5 * (x - mu) ** 2 / sig ** 2)
+    fullgmod = amp * np.exp(-0.5 * (fgx - mu) ** 2 / sig ** 2)
+    return gausmod - fullgmod.mean()
+
+@numba.jit()
+def g2_sig_surface(g2width, g2amp, g2position, g2shape):
+    g2frame = np.zeros(g2shape)
+    timechunks = g2shape[0]
+
+    timedelsaysize = g2shape[1]
+    x = np.arange(timedelsaysize)
+    for i in range(timechunks):
+        g2frame[i] = g2frame[i] + gaussian(x, g2position[i], g2width, g2amp[i])
+    return g2frame
+
+@numba.jit()
+def g2_sig_surface_gsub(g2width, g2amp, g2position, g2shape):
+    g2frame = np.zeros(g2shape)
+    timechunks = g2shape[0]
+
+    timedelsaysize = g2shape[1]
+    x = np.arange(timedelsaysize)
+    for i in range(timechunks):
+        g2frame[i] = g2frame[i] + gaussian_msub(x, g2position[i], g2width, g2amp[i])
+    return g2frame
+
+def fourier(x, *a):
+    tau=a[0]
+    phi=a[1]
+    ret = a[2] * np.cos(tau * x + phi)
+    for deg in range(3, len(a)-1):
+        ret += a[deg] * np.cos(tau*(deg+1) * 2 * x + phi)
+    return ret
+# @numba.jit()
+
+def sigmoid(x,fcut,sigsig):
+  return 1 / (1 + np.exp(-(x-fcut)/sigsig))
+
+def fourier_radio_clean(g2data, p0=[2,1]):
+    timd = np.arange(g2data.shape[1])
+    cleanframe = np.zeros(g2data.shape)
+    cleanpars = np.zeros((g2data.shape[0],3))
+    for i,g2sig in enumerate(g2data):
+        meansubg2 = g2sig - g2sig.mean()
+        popt, pcov = curve_fit(fourier, timd, meansubg2, p0=p0 + 1 * [np.ptp(g2sig)], maxfev=10000)
+        formod = fourier(timd, *popt)
+        meanfoursub = meansubg2 -formod
+        cleanframe[i] = meanfoursub - meanfoursub.mean()
+        cleanpars[i] = popt
+    return cleanframe, cleanpars
+def radio_clean_sigmoid(dat, freqcut=65, sigsig=2):
+
+    radioindexfft = np.array([np.fft.fft(g - g.mean()) for g in dat])
+    nfreq = len((radioindexfft.mean(axis=0)))
+    freq = (np.arange(nfreq) - nfreq / 2) * 250e6 / (nfreq * 1e6)
+
+    gauwin = (1-sigmoid(freq,freqcut,sigsig))*(1-sigmoid(-freq,freqcut,sigsig))
+    gauwin = np.fft.fftshift(gauwin)
+    cleang2 = np.array([np.fft.ifft(g * gauwin) for g in radioindexfft]).real
+    return cleang2, radioindexfft, np.fft.fftshift(freq),gauwin
+
+
+def g2_shifter_mid(g2_surface, opd,cut=None):
+    length, width = g2_surface.shape
+    shiftsig = np.zeros((length, width))
+    roundopd = -np.array(np.ceil((opd-64)), dtype=int)
+    for i in range(0, length):
+        shiftsig[i] = np.roll(g2_surface[i], roundopd[i])
+    if cut:
+        midopd = (roundopd+opd).mean()
+        midind = int(np.ceil(midopd))
+        lowind = midind-cut
+        highind = midind+cut
+        shiftsig = shiftsig[:,lowind:highind]
+        newopd = roundopd+opd - midind + cut
+    else: newopd = roundopd+opd
+    return shiftsig,newopd
+
+def g2_amps_rbr(g2surf, opd):
+    gamps = []
+    tim = np.arange(len(g2surf[0]))
+    for i, rw in enumerate(g2surf):
+        fitg, fiterr = curve_fit(gaussian, tim, rw, [opd[i], .85, .2],
+                                 bounds=[[(opd[i]) * .999, .85, -10],
+                                         [(opd[i]) * 1.0001, .8501, 10]])
+        gamps.append(fitg[-1])
+    gamps = np.array(gamps)
+    return gamps
+
+def amp_anal_airy_limb(data, odp_corr, baseline, start, end, guess=[120,1,0.3,0.85], bounds=[[60,.4, 0.3,0.84],[400,1.2, 0.301,0.86]]):
+    cut_opd_correction = odp_corr - start
+    cutdata = data[:, start:end]
+    g2shape = cutdata.shape
+    def g2_sig_amp_ravel(x, *args):
+        airyarg = [term for term in args[:-1]]
+        g2amp_model = IImodels.airynormLimb(baseline, *airyarg)
+        g2amp_model = g2amp_model
+        g2mod = g2_sig_surface(args[-1], g2amp_model, cut_opd_correction, g2shape)
+        ravelg2 = (g2mod - g2mod.mean(axis=1)[:,None]).ravel()
+        return ravelg2
+    g2fitpar, g2fiterr = curve_fit(f=g2_sig_amp_ravel,
+                                   xdata=baseline,
+                                   ydata=cutdata.ravel(),
+                                   p0=guess,
+                                   bounds=bounds)
+    amps = IImodels.airynormLimb(baseline, *g2fitpar[:-1])
+    return amps, g2fitpar, g2fiterr

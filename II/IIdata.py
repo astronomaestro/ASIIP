@@ -9,6 +9,7 @@ from astroquery.vizier import Vizier
 from II import IItools
 from astropy.coordinates import get_sun
 from astropy.coordinates import get_moon
+from astropy.coordinates import FK5
 
 
 from astropy.utils import iers
@@ -92,7 +93,8 @@ class IItelescope():
         self.Bnss.append(Bns)
         self.Buds.append(Bud)
 
-    def star_track(self, ra=None, dec=None, sunangle=-15, alt_cut=20, obs_start=None, obs_end=None, Itime =1800 * u.s, pmra=None, pmdec=None):
+    def star_track(self, ra=None, dec=None, sunangle=-15, alt_cut=20, obs_start=None, obs_end=None, Itime =1800 * u.s, pmra=None, pmdec=None,
+                   equinox="J2022"):
         """
         This uses astropy to figure out the times available to measure a star throughout the night.
         :param ra: The right ascension of the star you wish to measure in J2000
@@ -107,10 +109,10 @@ class IItelescope():
         ra_dec = str(ra) + str(dec)
 
         if pmra == None:
-            starToTrack = SkyCoord(ra=ra, dec=dec, frame="icrs", equinox = "J2000")
+            starToTrack = SkyCoord(ra=ra, dec=dec, frame="icrs", equinox = equinox)
         else:
             # starToTrack = SkyCoord(ra=ra, dec=dec, pm_ra_cosdec=pmra, pm_dec=pmdec, frame="icrs", equinox = "J2000")
-            starToTrack = SkyCoord(ra=ra, dec=dec, frame="icrs", equinox="J2000")
+            starToTrack = SkyCoord(ra=ra, dec=dec, frame="icrs", equinox=equinox)
 
 
         starLoc = starToTrack.transform_to(self.telFrame)
@@ -133,14 +135,13 @@ class IItelescope():
         moon_loc = self.moonaltazs
 
         moon_sky_loc = SkyCoord(moon_loc.az, moon_loc.alt)
-        star_sky_location = SkyCoord(starLoc.az,
-                                     starLoc.alt)
+        star_sky_location = SkyCoord(starLoc.az,starLoc.alt)
         moon_star_separation = moon_sky_loc.separation(star_sky_location)
 
         if ra_dec not in self.star_dict:
             self.star_dict[ra_dec] = {}
-            self.star_dict[ra_dec]["RA"] = ra
-            self.star_dict[ra_dec]["DEC"] = dec
+            self.star_dict[ra_dec]["RA"] = starToTrack.transform_to(FK5(equinox=equinox)).ra.to('hourangle')
+            self.star_dict[ra_dec]["DEC"] = starToTrack.transform_to(FK5(equinox=equinox)).dec.to('degree')
             self.star_dict[ra_dec]["ObsTimes"] = observable_times
             # self.star_dict[ra_dec]["SideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][ftime_range] - starToTrack.ra
 
@@ -159,24 +160,18 @@ class IItelescope():
             int_starLoc = starToTrack.transform_to(self.intTelFrame)
             int_sky_ind = np.where((self.intsunaltazs.alt <= sunangle * u.deg) & (int_starLoc.alt >= alt_cut * u.deg))[0]
             int_observable_times = self.int_delta_time[int_sky_ind]
-            time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start-Itime) & (self.int_delta_time[int_sky_ind] <= obs_end+Itime))
+            time_range = np.where((self.int_delta_time[int_sky_ind] >= obs_start) & (self.int_delta_time[int_sky_ind] <= obs_end))
+            airmt = (starLoc[sky_ind].obstime - self.time_info).to("hour")
+            obsairmt = ((airmt>= obs_start) & (airmt <= obs_end))
 
-            if len(ftime_range[0]) > 2:
-                self.star_dict[ra_dec]["fIntTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
-                                                          ftime_range] - starToTrack.ra
-                self.star_dict[ra_dec]["fIntDelt"] = self.star_dict[ra_dec]["fIntTimes"][1] - \
-                                                     self.star_dict[ra_dec]["fIntTimes"][0]
-                self.star_dict[ra_dec]["fIntSideTimes"] = self.telFrame.obstime.sidereal_time('apparent')[sky_ind][
-                                                              ftime_range] - starToTrack.ra
-            else:
-
-                self.star_dict[ra_dec]["fIntTimes"] = None
-                self.star_dict[ra_dec]["fIntDelt"] = None
 
             if len(time_range[0]) > 1:
                 self.star_dict[ra_dec]["IntTimes"] = self.int_delta_time[int_sky_ind][time_range]
                 self.star_dict[ra_dec]["IntDelt"] = Itime.to('h')
-                self.star_dict[ra_dec]["IntSideTimes"] = self.intTelFrame.obstime.sidereal_time('apparent')[int_sky_ind][time_range] - starToTrack.ra
+                self.star_dict[ra_dec]["IntSideTimes"] = self.intTelFrame.obstime.sidereal_time('apparent')[int_sky_ind][time_range] - \
+                                                         starToTrack.transform_to(FK5(equinox=equinox)).ra
+                self.star_dict[ra_dec]["Airmass"] = starLoc.secz[sky_ind][obsairmt]
+
             else:
                 self.star_dict[ra_dec]["IntTimes"] = None
                 self.star_dict[ra_dec]["IntDelt"] = None

@@ -3,14 +3,36 @@ from astropy.modeling.models import custom_model
 import astropy.visualization as viz
 from II import IImodels, IIdisplay, IItools, IIdata
 from scipy.optimize import curve_fit
-from scipy.special import j1, jn_zeros
+from scipy.special import j1, jv, jn_zeros
+from scipy.signal import savgol_filter
 
 from matplotlib import pyplot as plt
 
 #norm = viz.ImageNormalize(1, stretch=viz.SqrtStretch())
 
 
-
+def airy1DLimb(xr, r, mu=0.3):
+    """
+    A function used to model a 1D Visibility curve of an airy disk
+    :param xr: The radius of your airy disk
+    :param r: the radius of the first zero of the airy disk
+    :return:
+    """
+    con = jn_zeros(1, 1)[0] / np.pi
+    con32 = jn_zeros(1, 1)[0] / np.pi
+    # con = 1
+    Bx = con * np.pi * xr / r
+    B1 = j1(Bx)
+    limCo = ((1 - mu) / 2 + mu / 3) ** -1
+    B_3_2 = jv(1.5, Bx)
+    if np.any(xr == 0):
+        both_zero = np.where((B1 == 0) & (B_3_2 == 0))
+        B1[both_zero] = 1
+        B_3_2[both_zero] = 1
+    BP1 = (1 - mu) * B1 / Bx
+    BP32 = mu * (np.pi / 2) ** .5 * (B_3_2 / Bx ** 1.5)
+    airy_mod = (limCo * (BP1 + BP32)) ** 2
+    return airy_mod
 
 
 def airy_disk2D(shape, xpos, ypos, angdiam, wavelength):
@@ -148,18 +170,27 @@ def binary_visibility2D(shape, flux_ratio, separation, wavelength, arcsec1, arcs
     met_wav = wavelength.to('m').value
     sep_rad = separation.to('rad').value
 
-    cen_offset = 1.22*met_wav/sep_rad/2
-
-    # V_1, v1func = airy_disk2D(shape, xpos, ypos, arcsec1, met_wav)
-    # V_2, v2func = airy_disk2D(shape, xpos, ypos, arcsec2, met_wav)
-    #
-    # norm = viz.ImageNormalize(1, stretch=viz.LogStretch())
-    #
-    # v1_v2_term = V_1 ** 2 + (flux_ratio * V_2) ** 2
-    # abs_term = 2 * flux_ratio * np.abs(V_1) * np.abs(V_2)
-
-
     baselines_vec = met_wav*np.sqrt((x - xpos) ** 2 + (y - ypos) ** 2)
     cos_term = np.cos(2 * np.pi / met_wav * np.dot(baselines_vec, sep_rad))
     result = (1 + flux_ratio ** 2 + 2 * flux_ratio * cos_term) / (1 + flux_ratio) ** 2
     return result
+
+def airynormoff(r, fzero, norm, offset):
+    airymod = (IImodels.airy1D(r, fzero) + offset) * norm
+    return airymod
+
+
+
+def binary_v2_r1r2(r, r1, r2, fratio, sep):
+    v1 = airynormoff(r, r1, 1, 0)
+    v2 = airynormoff(r, r2, 1, 0)
+    return ((v1) + (fratio ** 2) * (v2) + 2 * fratio * ((v1 ** .5) * (v2 ** .5)) * np.cos(
+        2 * np.pi * r * sep)) / (1 + fratio) ** 2
+
+def bin_smooth(r, r1, r2, fratio, sep):
+    bincor = binary_v2_r1r2(r, r1, r2, fratio, sep)
+    binmod = savgol_filter(bincor, 43, 3)
+    return binmod
+def airynormLimb(r, fzero, norm, lcon=0.3):
+    airymod = (airy1DLimb(r, fzero, lcon)) * norm
+    return airymod

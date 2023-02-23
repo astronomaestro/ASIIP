@@ -577,7 +577,7 @@ if __name__ == "__main__":
                                    max_sun_alt=max_sun_alt,
                                    timestep=int_time.value)
 
-    baselines = IItools.array_baselines(relative_tel_locs)
+    baselines, tel_names = IItools.array_baselines(relative_tel_locs)
     [tel_array.add_baseline(Bew=base[0], Bns=base[1], Bud=base[2]) for base in baselines]
 
 

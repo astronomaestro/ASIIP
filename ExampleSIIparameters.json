@@ -1,10 +1,10 @@
 {
-  "time": "2020-01-10 07:00:00",
+  "time": "2023-01-08 07:00:00",
   "obsName": "VERITAS",
   "raRange": [0,24],
   "decRange": [-20,90],
   "magRange": [-2,2],
-  "wavelength": 410e-9,
+  "wavelength": 416e-9,
   "telLocs": [[135.48, -8.61, 12.23],[44.1, -47.7, 4.4],[29.4, 60.1, 9.8],[-35.9, 11.3, 7.0]],
   "integrationTime":0.5,
   "telLat": 31.675,
