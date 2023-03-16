@@ -70,7 +70,7 @@ def array_spliner(x_old, y_old, x_new):
 
 def star_simulator(star_ha = 5.4382 * u.hourangle, star_dec = 28.6075 * u.deg, teldir="IIparameters2.json",
                    ang_diam = (1.2 * u.mas).to('rad').value, st=None, et=None, date="2020-12-26 07:00:00", starmag=1,
-                   starerr=1, equinox="J2022"):
+                   starerr=1, equinox="J2000"):
     with open(teldir) as jsondat:
     # jsondat = open(teldir)
         IIparam = json.load(jsondat)
@@ -319,7 +319,7 @@ def directory_crawler(basdir, mode, multired=False):
             if len(currentdir) == 0:
                 print("Reseting directory to starting directory")
                 currentdir = basdir
-            current_dirs = os.listdir(currentdir)
+            current_dirs = sorted(os.listdir(currentdir))
             for i, thing in enumerate(current_dirs):
                 print("%s: %s" % (i, thing))
 
@@ -559,8 +559,14 @@ def multi_pair_run_analysis(fuldir, timesum = 60):
 def main():
     continue_user_input = True
 
-    basedirnotfound = True
+    default_path = "/home/mando/ASIIP/data"
+    if os.path.exists(default_path):
+        basedirnotfound = False
+        stdir = default_path
+    else:
+        basedirnotfound = True
     # stdir = "datasii"
+
 
     if basedirnotfound:
         while(basedirnotfound):
