@@ -445,6 +445,16 @@ def radio_clean_sigmoid(dat, freqcut=65, sigsig=2):
     cleang2 = np.array([np.fft.ifft(g * gauwin) for g in radioindexfft]).real
     return cleang2, radioindexfft, np.fft.fftshift(freq),gauwin
 
+def g2_shifter(g2_surface, opd):
+    meanopd = np.array(opd - opd.mean())
+    minopd = meanopd - meanopd.max()
+    length, width = g2_surface.shape
+    shiftsig = np.zeros((length, width))
+    x = np.arange(width, dtype=int)
+    for i in range(0, length):
+        xg =np.array(np.ceil(x + minopd[i]), dtype=int)
+        shiftsig[i] = g2_surface[i][xg]
+    return shiftsig
 
 def g2_shifter_mid(g2_surface, opd,cut=None):
     length, width = g2_surface.shape
@@ -491,3 +501,28 @@ def amp_anal_airy_limb(data, odp_corr, baseline, start, end, guess=[120,1,0.3,0.
                                    bounds=bounds)
     amps = IImodels.airynormLimb(baseline, *g2fitpar[:-1])
     return amps, g2fitpar, g2fiterr
+
+def g2_opd_fitter(data, g2width, odp_corr, baseline, order=3):
+
+    cutdata = data
+    g2shape = cutdata.shape
+    cut_opd_correction = odp_corr
+    def g2_sig_amp_ravel(x, *args):
+        polyterms = [term for term in args]
+        g2amp_poly = np.poly1d(polyterms[1:])
+        g2amp_model = g2amp_poly(x)
+        opd_off=args[0]
+        ravelg2 = g2_sig_surface(g2width, g2amp_model, cut_opd_correction+opd_off, g2shape).ravel()
+        return ravelg2
+
+    time = np.arange(cutdata.shape[0])
+
+    guess_par = np.zeros(order+1)
+    guess_par[0] = 0
+    g2fitpar, g2fiterr = curve_fit(f=g2_sig_amp_ravel,
+                                   xdata=baseline,
+                                   ydata=cutdata.ravel(),
+                                   p0=guess_par,
+                                   maxfev=5000)
+    amps = np.poly1d(g2fitpar[1:])(baseline)
+    return amps, cut_opd_correction, cutdata, g2fitpar

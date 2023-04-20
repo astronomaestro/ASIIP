@@ -175,7 +175,7 @@ def binary_visibility2D(shape, flux_ratio, separation, wavelength, arcsec1, arcs
     result = (1 + flux_ratio ** 2 + 2 * flux_ratio * cos_term) / (1 + flux_ratio) ** 2
     return result
 
-def airynormoff(r, fzero, norm, offset):
+def airynormoff(r, fzero, norm, offset=0):
     airymod = (IImodels.airy1D(r, fzero) + offset) * norm
     return airymod
 

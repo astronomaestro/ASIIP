@@ -400,6 +400,7 @@ def single_target_analysis(args):
 
         mas = 1
         hoff = 0
+        g2width = 1.2
         radstar, ampstar, skytimes, telarr, ra_dec_str, my_odp_corrs, utrack, vtrack, tel_arr = \
             star_simulator(ra * u.hourangle, dec * u.deg,
                            ang_diam=(mas * u.mas).to('rad').value,
@@ -436,7 +437,8 @@ def single_target_analysis(args):
             timedelay_tocheck,
             datstart=0,
             datend=radiofilt_g2surface[cutvolts].shape[1],
-            order=1)
+            order=1,
+            g2width=g2width)
 
         savename = "%s %s %s" % (targetname, telname, datadate)
         measstd = radiofilt_g2surface.std(axis=1)
@@ -492,14 +494,16 @@ def single_target_analysis(args):
                             tshift,
                             fourier_pars,
                             cutvolts,
-                            radio_clean_g2_res)
+                            radio_clean_g2_res,
+                            g2width=g2width)
 
             IIdisplay.fit_graph(radiofilt_g2surface[:, :-1][cutvolts],
                       (avg_telopdcorr + tshift)[cutvolts],
                       telbaseline[cutvolts],
                       savename,
                       graph_save_dir,
-                      4)
+                      4,
+                      g2width=g2width)
 
             webbrowser.open(os.path.relpath(graph_save_dir))
             startposition = (avg_telopdcorr[0] + tshift)

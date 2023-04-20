@@ -314,7 +314,7 @@ def pdf_fit_and_plot(dat, title, bins):
 
 
 def analysis_graphs(g2_surface, g2_shifted, g2_filtered,telopd, roundopd, baseline, g2_surface_raw, measstd, fitstd, chunk_time,
-                    savename, targmag, graph_save_dir, tlin_cor, ampmeans,tshift, fourier_pars, cutvolts, radio_clean_g2_res):
+                    savename, targmag, graph_save_dir, tlin_cor, ampmeans,tshift, fourier_pars, cutvolts, radio_clean_g2_res, g2width):
     myg2 = g2_shifted[cutvolts].mean(axis=0)
     tim = np.arange(len(myg2))
     midpoint = roundopd.mean()
@@ -325,13 +325,13 @@ def analysis_graphs(g2_surface, g2_shifted, g2_filtered,telopd, roundopd, baseli
     plt.ylabel("g2 Amplitude (unNormalized coherence 1X10^-6)", fontsize=14)
     startpos = midpoint + tshift
 
-    fitg, fiterr = curve_fit(IItools.gaussian, tim, myg2, [startpos, .85, .0],
-                             bounds=[[startpos * .999, .85, -10],
-                                     [startpos * 1.0001, .8501, 10]])
+    fitg, fiterr = curve_fit(IItools.gaussian, tim, myg2, [startpos, g2width, .0],
+                             bounds=[[startpos * .999, g2width*.99, -10],
+                                     [startpos * 1.0001, g2width*1.01, 10]])
 
-    fitgorig, fiterrorig = curve_fit(IItools.gaussian, tim, myg2, [midpoint, .85, .0],
-                                     bounds=[[midpoint * .8, .85, -10],
-                                             [midpoint * 1.2, .8501, 10]])
+    fitgorig, fiterrorig = curve_fit(IItools.gaussian, tim, myg2, [midpoint, g2width, .0],
+                                     bounds=[[midpoint * .8, g2width*.99, -10],
+                                             [midpoint * 1.2, g2width*1.01, 10]])
 
 
     plt.plot((tim - midpoint)[20:-20], (myg2)[20:-20], label="DFT filtered g2 mean \nMean Baseline = %.4f" % (baseline.mean()))
@@ -360,9 +360,9 @@ def analysis_graphs(g2_surface, g2_shifted, g2_filtered,telopd, roundopd, baseli
     plt.ylabel("g2 Amplitude (unNormalized coherence 1X10^-6)", fontsize=14)
     plt.plot(tim[20:-20] - midpoint, myg2_raw[20:-20], label="Mean Raw Data\nMean Baseline = %.4f" % (baseline.mean()))
     opdpos = startpos
-    fitgraw, fiterrraw = curve_fit(IItools.gaussian, tim, myg2_raw, [opdpos, .85, .2],
-                                   bounds=[[opdpos * .999, .85, -10],
-                                           [opdpos * 1.0001, .8501, 10]])
+    fitgraw, fiterrraw = curve_fit(IItools.gaussian, tim, myg2_raw, [opdpos, g2width, .2],
+                                   bounds=[[opdpos * .999, g2width*.99, -10],
+                                           [opdpos * 1.0001, g2width*1.01, 10]])
     plt.plot(timedelay - midpoint, IItools.gaussian(timedelay, *fitgraw), '--',
              label="g2 Amplitude = %.4f X 10^-6" % (fitgraw[-1]))
     plt.plot(timedelay - midpoint,
@@ -471,15 +471,15 @@ def analysis_graphs(g2_surface, g2_shifted, g2_filtered,telopd, roundopd, baseli
     plt.legend(fontsize=14)
     graph_saver(graph_save_dir, g2DFTFilteringTitle)
 
-def fit_graph(g2surface, opd, baselines, savename,graph_save_dir, order=8):
+def fit_graph(g2surface, opd, baselines, savename,graph_save_dir, order=8, g2width=1.2):
     allamps, allopdcut, alldatacut, polypars = IItools.amp_anal(g2surface, opd, baselines, 0, 800, order)
     airyallamps, fitpar, g2fiterr = IItools.amp_anal_airy_limb(data=g2surface,
                                                        odp_corr=opd,
                                                        baseline=baselines,
                                                        start=0,
                                                        end=800,
-                                                       guess=[120, 1, .0, 0.867],
-                                                       bounds=[[60, 1, .0, 0.867], [400, 1.0001, .0001, 0.867000111]])
+                                                       guess=[120, 1, .0, g2width],
+                                                       bounds=[[60, 1, .0, g2width*0.99], [400, 1.0001, .0001, g2width*1.01]])
 
     plt.figure(figsize=(10, 5))
     plt.plot(baselines, allamps, '.', label="Poly fit to VERITAS data")
@@ -510,7 +510,7 @@ def fit_graph(g2surface, opd, baselines, savename,graph_save_dir, order=8):
     plt.title(savetitle, fontsize=18)
     graph_saver(graph_save_dir, savetitle)
 
-    g2model = IItools.g2_sig_surface(0.85, airyallamps, opd, g2surface.shape)
+    g2model = IItools.g2_sig_surface(g2width, airyallamps, opd, g2surface.shape)
     opdmin = int(opd.min() - 7)
     opdmax = int(opd.max() + 7)
     plt.figure(figsize=(14, 10))
