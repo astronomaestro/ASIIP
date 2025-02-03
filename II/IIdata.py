@@ -322,7 +322,7 @@ class IItelescope():
                                      DEJ2000='>%s & <%s'%(dec_range[0], dec_range[1]))
 
         if result:
-            good_val = np.where(~np.isnan(result[0]['R_']) & ~np.isnan(result[0]['Dist']))
+            good_val = np.where(~np.isnan(result[0]['R*']) & ~np.isnan(result[0]['Dist']))
 
             self.tess = result[0][good_val]
             self.catalogs.append(self.tess)
@@ -406,7 +406,7 @@ class IItelescope():
             ra = Angle(star["RAJ2000"], 'hourangle')
             dec = Angle(star["DEJ2000"], 'deg')
             dist= star['Dist']
-            diam= (star['R_']*2)*u.solRad
+            diam= (star['R*']*2)*u.solRad
             ang_diam = (((diam.to('m')/dist.to('m')))*u.rad).to('arcsec')
             mag_name = "Vmag"
             mag = star[mag_name]
