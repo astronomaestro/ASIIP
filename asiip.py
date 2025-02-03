@@ -417,7 +417,7 @@ def catalog_interaction(master_SII_cat):
                                      pmdec=pmdec)
                 I_time = tel_array.star_dict[star_id]["IntDelt"]
 
-                if I_time:
+                if not I_time == None:
                     star_err, hour_angle_rad, dec_angle_rad, lat, tel_tracks, airy_disk, airy_func = \
                         star_model(tel_array=tel_array, I_time=I_time, star_mag=star_mag, ang_diam=ang_diam,
                                    wavelength=wavelength, star_id=star_id)
