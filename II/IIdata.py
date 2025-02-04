@@ -8,7 +8,7 @@ import os
 from astroquery.vizier import Vizier
 from II import IItools
 from astropy.coordinates import get_sun
-from astropy.coordinates import get_moon
+from astropy.coordinates import get_body
 from astropy.coordinates import FK5
 
 
@@ -50,8 +50,8 @@ class IItelescope():
 
 
         #get indicies for when sky is dark
-        self.sunaltazs = get_sun(self.delta_time+self.time_info).transform_to(self.telFrame)
-        self.moonaltazs = get_moon(self.delta_time+self.time_info).transform_to(self.telFrame)
+        self.sunaltazs = get_body("sun",(self.delta_time+self.time_info)).transform_to(self.telFrame)
+        self.moonaltazs = get_body("moon",(self.delta_time+self.time_info)).transform_to(self.telFrame)
         dark_times = np.where((self.sunaltazs.alt < max_sun_alt * u.deg))
         self.dark_times = self.telFrame.obstime.sidereal_time('apparent')[dark_times]
         self.max_sun_alt = max_sun_alt
@@ -127,8 +127,8 @@ class IItelescope():
             return 0
         mintime = np.min(observable_times)
         maxtime = np.max(observable_times)
-        if not obs_start: obs_start = mintime
-        if not obs_end: obs_end = maxtime
+        if obs_start == None: obs_start = mintime
+        if obs_end == None: obs_end = maxtime
 
         ftime_range = np.where((observable_times >= obs_start-Itime) & (observable_times <= obs_end+Itime))
 

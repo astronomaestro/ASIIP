@@ -22,10 +22,8 @@ if os.name=='nt': mpl.use('Qt5Agg')
 # else: mpl.use('TkAgg')
 
 
-Simbad.add_votable_fields('flux(B)', 'flux(G)', 'flux(V)', 'sptype', 'rot', "v*", "velocity", "distance",
-                          "diameter", "pm",
-                          "morphtype")
-
+# Simbad.add_votable_fields('flux(B)', 'flux(G)', 'flux(V)', 'sptype', 'rot', "v*", "velocity", "distance","diameter","morphtype")
+Simbad.add_votable_fields('B', 'G', 'V')
 sep_line = "-----------------------------------------------------------------------------------------------------------"
 red_line = '\n\x1b[1;31;40m' + sep_line + '\x1b[0m\n'
 same_input_output_warning = "!!!!The input and output directory are the same. This is likely a big mistake so the script will abort!!!!"
@@ -385,12 +383,12 @@ def single_target_analysis(args):
             if targetname == 'mulep':
                 cortargname = "mu lep"
             result_table = Simbad.query_object(cortargname)
-            raraw = result_table["RA"]
-            decraw = result_table["DEC"]
+            raraw = result_table["ra"]
+            decraw = result_table["dec"]
             skycoord = SkyCoord(raraw, decraw, unit=("hourangle", "deg"))
             ra = skycoord.ra.to("hourangle").value[0]
             dec = skycoord.dec.to("degree").value[0]
-            targmag = result_table["FLUX_B"].value[0]
+            targmag = result_table["B"].value[0]
         except Exception as e:
             print(e)
             print()
